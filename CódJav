@@ -1,0 +1,424 @@
+import React, { useState, useEffect, createContext, useContext } from 'react';
+
+// Importar ícones do Lucide React
+import { Home, Package, Wheat, Truck, Users, ArrowLeftRight, Plus, Edit, Trash2, Save, X, Search, Info, Factory, Loader2, ShoppingCart, DollarSign, UserCheck, Clock, CheckCircle, XCircle, AlertTriangle, Box, LogOut, UserPlus, UserCog, Eye, EyeOff, Settings } from 'lucide-react';
+
+// Contexto para mensagens do aplicativo
+const AppMessageContext = createContext();
+
+// Hook customizado para usar o contexto de mensagens
+export const useAppMessage = () => useContext(AppMessageContext);
+
+// Componente para exibir mensagens (toast/snackbar) - Exemplo básico
+const AppMessageDisplay = () => {
+  const { appMessage, setAppMessage } = useContext(AppMessageContext);
+
+  useEffect(() => {
+    if (appMessage.message) {
+      const timer = setTimeout(() => {
+        setAppMessage({ message: '', type: '' });
+      }, 5000); // Mensagem some após 5 segundos
+      return () => clearTimeout(timer);
+    }
+  }, [appMessage, setAppMessage]);
+
+  if (!appMessage.message) return null;
+
+  const bgColor = appMessage.type === 'success' ? 'bg-green-500' :
+                  appMessage.type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+
+  return (
+    <div className={`fixed bottom-4 right-4 p-4 rounded-lg text-white shadow-lg z-50 animate-fade-in-up ${bgColor}`}>
+      <p className="font-semibold">{appMessage.title || 'Info'}</p>
+      <p className="text-sm">{appMessage.message}</p>
+    </div>
+  );
+};
+
+function App() {
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  // Simulando um utilizador logado com papel de administrador para desenvolvimento local
+  const [currentUser, setCurrentUser] = useState({ uid: 'local-admin-user', email: 'admin@local.com' });
+  const [userId, setUserId] = useState('local-admin-user');
+  const [userRole, setUserRole] = useState('admin'); // Papel fixo como 'admin'
+  const [isLoading, setIsLoading] = useState(false); // Não há carregamento inicial de dados externos
+  const [showCadastroMenu, setShowCadastroMenu] = useState(false);
+
+  // Estados para mensagens de aplicativo (toast/snackbar)
+  const [appMessage, setAppMessage] = useState({ message: '', type: '' });
+
+  const showAppMessage = (title, message, type = 'info') => {
+    setAppMessage({ title, message, type });
+  };
+
+  // Dados de exemplo para o modo local
+  const [insumos, setInsumos] = useState([
+    { id: '1', nome: 'Milho', unidade: 'kg', estoque: 5000, custo: 1.50 },
+    { id: '2', nome: 'Soja', unidade: 'kg', estoque: 3000, custo: 2.20 },
+    { id: '3', nome: 'Calcário', unidade: 'kg', estoque: 1000, custo: 0.80 },
+  ]);
+  const [produtos, setProdutos] = useState([
+    { id: '1', nome: 'Ração Frango Inicial', unidade: 'kg', estoque: 2000, preco: 3.00 },
+    { id: '2', nome: 'Ração Suínos Crescimento', unidade: 'kg', estoque: 1500, preco: 2.80 },
+  ]);
+  const [fornecedores, setFornecedores] = useState([
+    { id: '1', nome: 'AgroGrãos Ltda.', contato: 'João Silva', telefone: '(11) 98765-4321' },
+    { id: '2', nome: 'NutriCampo S.A.', contato: 'Maria Souza', telefone: '(21) 99876-5432' },
+  ]);
+  const [clientes, setClientes] = useState([
+    { id: '1', nome: 'Fazenda Boa Vista', contato: 'Carlos Pereira', telefone: '(21) 91234-5678' },
+    { id: '2', nome: 'Granja Esperança', contato: 'Ana Costa', telefone: '(31) 92345-6789' },
+  ]);
+  const [formulas, setFormulas] = useState([
+    { id: '1', nome: 'Fórmula Padrão Frango', produtoId: '1', ingredientes: [{ insumoId: '1', quantidadePorUnidadeProduto: 0.7, unidade: 'kg' }, { insumoId: '2', quantidadePorUnidadeProduto: 0.3, unidade: 'kg' }] },
+  ]);
+  const [ordensProducao, setOrdensProducao] = useState([
+    { id: 'op1', data: '2025-07-16', formulaId: '1', quantidadeProduzida: 500, status: 'Pendente' },
+    { id: 'op2', data: '2025-07-15', formulaId: '1', quantidadeProduzida: 300, status: 'Concluído', dataConclusao: '2025-07-15' },
+  ]);
+  const [pedidos, setPedidos] = useState([
+    { id: 'ped1', clienteId: '1', dataPedido: '2025-07-15', itens: [{ produtoId: '1', quantidade: 100, precoUnitario: 3.00 }], valorTotal: 300, status: 'Pendente', formaPagamento: 'Pix', prazoPagamento: 'À vista' },
+    { id: 'ped2', clienteId: '2', dataPedido: '2025-07-14', itens: [{ produtoId: '2', quantidade: 50, precoUnitario: 2.80 }], valorTotal: 140, status: 'Concluído', formaPagamento: 'Boleto', prazoPagamento: '30 dias', dataConclusao: '2025-07-14' },
+  ]);
+  const [contasAPagar, setContasAPagar] = useState([
+    { id: 'cp1', descricao: 'Aluguel Galpão', valor: 1500, dataVencimento: '2025-07-20', fornecedorId: '1', status: 'Pendente' },
+    { id: 'cp2', descricao: 'Energia Elétrica', valor: 500, dataVencimento: '2025-07-10', fornecedorId: '', status: 'Pendente' },
+    { id: 'cp3', descricao: 'Compra de Soja', valor: 600, dataVencimento: '2025-07-01', fornecedorId: '2', status: 'Pago', dataPagamento: '2025-06-30' },
+  ]);
+  const [contasAReceber, setContasAReceber] = useState([
+    { id: 'cr1', descricao: 'Venda Pedido ped1', valor: 300, dataVencimento: '2025-07-18', clienteId: '1', status: 'Pendente' },
+    { id: 'cr2', descricao: 'Venda Pedido ped2', valor: 140, dataVencimento: '2025-07-14', clienteId: '2', status: 'Recebido', dataRecebimento: '2025-07-14' },
+    { id: 'cr3', descricao: 'Consultoria Agrícola', valor: 250, dataVencimento: '2025-07-05', clienteId: '1', status: 'Pendente' },
+  ]);
+  const [movimentacoes, setMovimentacoes] = useState([
+    { id: 'mov1', data: '2025-07-16', tipo: 'entrada', itemId: '1', nomeItem: 'Milho', unidade: 'kg', quantidade: 100, numeroNota: 'NF-001', fornecedorId: '1', formaPagamento: 'Pix', prazoPagamento: 'À vista' },
+    { id: 'mov2', data: '2025-07-15', tipo: 'saida', itemId: '1', nomeItem: 'Ração Frango Inicial', unidade: 'kg', quantidade: 50, numeroNota: 'NF-002', clienteId: '1', formaPagamento: 'Boleto', prazoPagamento: '30 dias' },
+  ]);
+  const [allUserProfiles, setAllUserProfiles] = useState([
+    { id: 'local-admin-user', email: 'admin@local.com', name: 'Administrador Local', role: 'admin' }
+  ]); // Para GerenciarUsuarios - simulado
+
+  // Estados para formulários de edição/criação
+  const [editingItem, setEditingItem] = useState(null);
+  const [formType, setFormType] = useState('');
+
+  // Estados para o modal de confirmação de exclusão ou produção/pedido
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalMessage, setConfirmModalMessage] = useState('');
+  const [confirmModalAction, setConfirmModalAction] = useState(() => () => {});
+
+  // Estados para o item a ser excluído ou ordem a ser confirmada
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [typeToDelete, setTypeToDelete] = useState('');
+  const [orderToConfirm, setOrderToConfirm] = useState(null);
+  const [pedidoToConfirm, setPedidoToConfirm] = useState(null);
+  const [contaToConfirm, setContaToConfirm] = useState(null);
+  const [contaTypeToConfirm, setContaTypeToConfirm] = useState('');
+
+  // Funções CRUD Locais
+  const getCollection = (type) => {
+    switch (type) {
+      case 'insumo': return insumos;
+      case 'produto': return produtos;
+      case 'fornecedor': return fornecedores;
+      case 'cliente': return clientes;
+      case 'formula': return formulas;
+      case 'ordemProducao': return ordensProducao;
+      case 'pedido': return pedidos;
+      case 'contaPagar': return contasAPagar;
+      case 'contaReceber': return contasAReceber;
+      case 'movimentacao': return movimentacoes;
+      case 'userProfile': return allUserProfiles; // Para gerenciar usuários (simulado)
+      default: return [];
+    }
+  };
+
+  const setCollection = (type, newData) => {
+    switch (type) {
+      case 'insumo': setInsumos(newData); break;
+      case 'produto': setProdutos(newData); break;
+      case 'fornecedor': setFornecedores(newData); break;
+      case 'cliente': setClientes(newData); break;
+      case 'formula': setFormulas(newData); break;
+      case 'ordemProducao': setOrdensProducao(newData); break;
+      case 'pedido': setPedidos(newData); break;
+      case 'contaPagar': setContasAPagar(newData); break;
+      case 'contaReceber': setContasAReceber(newData); break;
+      case 'movimentacao': setMovimentacoes(newData); break;
+      case 'userProfile': setAllUserProfiles(newData); break;
+      default: break;
+    }
+  };
+
+  const addItem = async (type, newItem) => {
+    try {
+      const currentCollection = getCollection(type);
+      const newItemWithId = { ...newItem, id: crypto.randomUUID() };
+      setCollection(type, [...currentCollection, newItemWithId]);
+      showAppMessage('Sucesso!', `${type.charAt(0).toUpperCase() + type.slice(1)} adicionado com sucesso!`, 'success');
+    } catch (error) {
+      console.error(`Erro ao adicionar ${type}:`, error);
+      showAppMessage('Erro ao Adicionar', `Não foi possível adicionar o ${type}. Detalhes: ${error.message}`, 'error');
+    }
+  };
+
+  const updateItem = async (type, updatedItem) => {
+    try {
+      const currentCollection = getCollection(type);
+      setCollection(type, currentCollection.map(item =>
+        item.id === updatedItem.id ? updatedItem : item
+      ));
+      showAppMessage('Sucesso!', `${type.charAt(0).toUpperCase() + type.slice(1)} atualizado com sucesso!`, 'success');
+    } catch (error) {
+      console.error(`Erro ao atualizar ${type}:`, error);
+      showAppMessage('Erro ao Atualizar', `Não foi possível atualizar o ${type}. Detalhes: ${error.message}`, 'error');
+    }
+  };
+
+  const deleteItem = async (type, id) => {
+    try {
+      const currentCollection = getCollection(type);
+      setCollection(type, currentCollection.filter(item => item.id !== id));
+      showAppMessage('Sucesso!', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso!`, 'success');
+    } catch (error) {
+      console.error(`Erro ao excluir ${type}:`, error);
+      showAppMessage('Erro ao Excluir', `Não foi possível excluir o ${type}. Detalhes: ${error.message}`, 'error');
+    }
+  };
+
+  const handleDeleteConfirmed = () => {
+    if (itemToDelete && typeToDelete) {
+      deleteItem(typeToDelete, itemToDelete.id);
+    }
+    setShowConfirmModal(false);
+    setItemToDelete(null);
+    setTypeToDelete('');
+  };
+
+  const handleDeleteRequest = (type, item) => {
+    setItemToDelete(item);
+    setTypeToDelete(type);
+    setConfirmModalMessage(`Tem certeza que deseja excluir "${item.nome || item.id || item.descricao}"? Esta ação não pode ser desfeita.`);
+    setConfirmModalAction(() => handleDeleteConfirmed);
+    setShowConfirmModal(true);
+  };
+
+  const handleEdit = (item, type) => {
+    setEditingItem(item);
+    setFormType(type);
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const newItem = {};
+    formData.forEach((value, key) => {
+      newItem[key] = key === 'estoque' || key === 'custo' || key === 'preco' || key === 'quantidadeProduzida' || key === 'quantidadeNecessaria' || key === 'quantidade' || key === 'precoUnitario' || key === 'valorTotal' || key === 'valor' ? parseFloat(value) : value;
+    });
+
+    if (formType === 'formula') {
+      const ingredientes = [];
+      const ingredienteIdElements = e.target.elements['ingredienteId'];
+      const quantidadeNecessariaElements = e.target.elements['quantidadeNecessaria'];
+      const ingredienteUnidadeElements = e.target.elements['ingredienteUnidade'];
+
+      const numIngredientes = ingredienteIdElements ? (ingredienteIdElements.length || 1) : 0;
+
+      if (numIngredientes > 0) {
+        if (numIngredientes === 1 && ingredienteIdElements.value !== undefined) {
+          ingredientes.push({
+            insumoId: ingredienteIdElements.value,
+            quantidadePorUnidadeProduto: parseFloat(quantidadeNecessariaElements.value),
+            unidade: ingredienteUnidadeElements.value,
+          });
+        } else {
+          for (let i = 0; i < numIngredientes; i++) {
+            ingredientes.push({
+              insumoId: ingredienteIdElements[i].value,
+              quantidadePorUnidadeProduto: parseFloat(quantidadeNecessariaElements[i].value),
+              unidade: ingredienteUnidadeElements[i].value,
+            });
+          }
+        }
+      }
+      newItem.ingredientes = ingredientes;
+    } else if (formType === 'pedido') {
+        const itens = [];
+        const produtoIdElements = e.target.elements['produtoId'];
+        const quantidadeElements = e.target.elements['quantidade'];
+        const precoUnitarioElements = e.target.elements['precoUnitario'];
+
+        const numItens = produtoIdElements ? (produtoIdElements.length || 1) : 0;
+
+        if (numItens === 1 && produtoIdElements.value !== undefined) {
+            itens.push({
+                produtoId: produtoIdElements.value,
+                quantidade: parseFloat(quantidadeElements.value),
+                precoUnitario: parseFloat(precoUnitarioElements.value),
+            });
+        } else if (numItens > 1) {
+            for (let i = 0; i < numItens; i++) {
+                itens.push({
+                    produtoId: produtoIdElements[i].value,
+                    quantidade: parseFloat(quantidadeElements[i].value),
+                    precoUnitario: parseFloat(precoUnitarioElements[i].value),
+                });
+            }
+        }
+        newItem.itens = itens;
+        newItem.valorTotal = itens.reduce((sum, item) => sum + (item.quantidade * item.precoUnitario), 0);
+        newItem.dataPedido = new Date().toISOString().slice(0, 10);
+        newItem.status = 'Pendente';
+        newItem.formaPagamento = formData.get('formaPagamento');
+        newItem.prazoPagamento = formData.get('prazoPagamento');
+    } else if (formType === 'contaPagar') {
+        newItem.status = 'Pendente';
+    } else if (formType === 'contaReceber') {
+        newItem.status = 'Pendente';
+    }
+
+    if (editingItem && editingItem.id) {
+      updateItem(formType, { ...editingItem, ...newItem });
+    } else {
+      addItem(formType, newItem);
+    }
+    setEditingItem(null);
+    setFormType('');
+  };
+
+  const handleCancel = () => {
+    setEditingItem(null);
+    setFormType('');
+  };
+
+  // Funções de Autenticação (simuladas para modo local)
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setUserId(null);
+    setUserRole(null);
+    setCurrentPage('login'); // Redireciona para uma tela de "login" simulada
+    showAppMessage('Logout', 'Sessão encerrada (simulada).', 'info');
+  };
+
+  // Componente de Navegação Inferior
+  const Navbar = () => (
+    <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-green-600 to-lime-700 p-2 shadow-lg z-50 rounded-t-xl">
+      <ul className="flex justify-around items-center h-full">
+        {/* Pedidos - Apenas para Admin e Vendas */}
+        {(userRole === 'admin' || userRole === 'vendas') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('pedidos')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${currentPage === 'pedidos' ? 'bg-white text-green-700 shadow-md' : 'text-white hover:bg-green-700'}`}
+            >
+              <ShoppingCart size={20} />
+              <span className="text-xs mt-1">Pedidos</span>
+            </button>
+          </li>
+        )}
+        {/* Produção - Apenas para Admin e Produção */}
+        {(userRole === 'admin' || userRole === 'producao') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('producao')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300
+                ${currentPage === 'producao' ? 'bg-yellow-400 text-green-900 shadow-lg scale-110' : 'text-white hover:bg-green-700'}`} style={{ transform: currentPage === 'producao' ? 'scale(1.1)' : 'scale(1)' }}
+            >
+              <Factory size={20} />
+              <span className="text-xs mt-1">Produção</span>
+            </button>
+          </li>
+        )}
+        {/* Financeiro - Apenas para Admin e Financeiro */}
+        {(userRole === 'admin' || userRole === 'financeiro') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('financeiro')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${currentPage === 'financeiro' ? 'bg-white text-green-700 shadow-md' : 'text-white hover:bg-green-700'}`}
+            >
+              <DollarSign size={20} />
+              <span className="text-xs mt-1">Financeiro</span>
+            </button>
+          </li>
+        )}
+        {/* Movimentação - Apenas para Admin */}
+        {(userRole === 'admin') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('movimentacao')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${currentPage === 'movimentacao' ? 'bg-white text-green-700 shadow-md' : 'text-white hover:bg-green-700'}`}
+            >
+              <ArrowLeftRight size={20} />
+              <span className="text-xs mt-1">Mov.</span>
+            </button>
+          </li>
+        )}
+      </ul>
+    </nav>
+  );
+
+  // Componente de Cabeçalho
+  const Header = ({ title }) => (
+    <header className="sticky top-0 bg-gradient-to-r from-green-700 to-lime-800 text-white p-4 text-center shadow-md rounded-b-xl z-40 flex justify-between items-center px-4 sm:px-6">
+      <button
+        onClick={() => {
+          setCurrentPage('dashboard');
+          setShowCadastroMenu(true);
+        }}
+        className="text-white hover:text-green-200 transition-colors duration-300 p-2 rounded-lg"
+        title="Início e Cadastros"
+      >
+        <Home size={24} />
+      </button>
+      <h1 className="text-xl sm:text-2xl font-bold">{title}</h1>
+      <div className="flex items-center">
+        {userRole && (
+          <p className="text-sm mr-2">Perfil: <span className="font-semibold">{userRole.charAt(0).toUpperCase() + userRole.slice(1)}</span></p>
+        )}
+        {currentUser && (
+          <>
+            {/* Botão de configurações de utilizador removido, pois não há alteração de senha local */}
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 text-white px-3 py-1 rounded-md shadow-sm hover:bg-red-600 transition-colors duration-300 flex items-center"
+              title="Sair"
+            >
+              <LogOut size={18} className="mr-1" /> Sair (Simulado)
+            </button>
+          </>
+        )}
+      </div>
+      {userId && (
+        <p className="text-xs mt-1 opacity-80 absolute bottom-1 left-1/2 -translate-x-1/2">ID do Utilizador: {userId}</p>
+      )}
+    </header>
+  );
+
+  // Componente de Modal/Formulário
+  const FormModal = ({ children, title, onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md animate-fade-in-up overflow-y-auto max-h-[90vh]">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-green-800">{title}</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={24} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  // Componente de Confirmação
+  const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm animate-fade-in-up text-center">
+        <Info size={48} className="mx-auto text-yellow-500 mb-4" />
+        <p className="text-lg font-semibold text-gray-800 mb-6">{message}</p>
+        <div className="flex justify-center space-x-4">
+          <button
+            onClick={onCancel}
+            className="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300"
+          >
+            Cancelar
+          <
