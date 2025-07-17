@@ -1,0 +1,3202 @@
+import React, { useState, useEffect, createContext, useContext } from 'react';
+
+// Importar ícones do Lucide React
+import { Home, Package, Wheat, Truck, Users, ArrowLeftRight, Plus, Edit, Trash2, Save, X, Search, Info, Factory, Loader2, ShoppingCart, DollarSign, UserCheck, Clock, CheckCircle, XCircle, AlertTriangle, Box, LogOut, UserPlus, UserCog, Eye, EyeOff, Settings } from 'lucide-react';
+
+// Contexto para mensagens do aplicativo
+const AppMessageContext = createContext();
+
+// Hook customizado para usar o contexto de mensagens
+export const useAppMessage = () => useContext(AppMessageContext);
+
+// Componente para exibir mensagens (toast/snackbar) - Exemplo básico
+const AppMessageDisplay = () => {
+  const { appMessage, setAppMessage } = useContext(AppMessageContext);
+
+  useEffect(() => {
+    if (appMessage.message) {
+      const timer = setTimeout(() => {
+        setAppMessage({ message: '', type: '' });
+      }, 5000); // Mensagem some após 5 segundos
+      return () => clearTimeout(timer);
+    }
+  }, [appMessage, setAppMessage]);
+
+  if (!appMessage.message) return null;
+
+  const bgColor = appMessage.type === 'success' ? 'bg-green-500' :
+                  appMessage.type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+
+  return (
+    <div className={`fixed bottom-4 right-4 p-4 rounded-lg text-white shadow-lg z-50 animate-fade-in-up ${bgColor}`}>
+      <p className="font-semibold">{appMessage.title || 'Info'}</p>
+      <p className="text-sm">{appMessage.message}</p>
+    </div>
+  );
+};
+
+function App() {
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  // Simulando um utilizador logado com papel de administrador para desenvolvimento local
+  const [currentUser, setCurrentUser] = useState({ uid: 'local-admin-user', email: 'admin@local.com' });
+  const [userId, setUserId] = useState('local-admin-user');
+  const [userRole, setUserRole] = useState('admin'); // Papel fixo como 'admin'
+  const [isLoading, setIsLoading] = useState(false); // Não há carregamento inicial de dados externos
+  const [showCadastroMenu, setShowCadastroMenu] = useState(false);
+
+  // Estados para mensagens de aplicativo (toast/snackbar)
+  const [appMessage, setAppMessage] = useState({ message: '', type: '' });
+
+  const showAppMessage = (title, message, type = 'info') => {
+    setAppMessage({ title, message, type });
+  };
+
+  // Dados de exemplo para o modo local
+  const [insumos, setInsumos] = useState([
+    { id: '1', nome: 'Milho', unidade: 'kg', estoque: 5000, custo: 1.50 },
+    { id: '2', nome: 'Soja', unidade: 'kg', estoque: 3000, custo: 2.20 },
+    { id: '3', nome: 'Calcário', unidade: 'kg', estoque: 1000, custo: 0.80 },
+  ]);
+  const [produtos, setProdutos] = useState([
+    { id: '1', nome: 'Ração Frango Inicial', unidade: 'kg', estoque: 2000, preco: 3.00 },
+    { id: '2', nome: 'Ração Suínos Crescimento', unidade: 'kg', estoque: 1500, preco: 2.80 },
+  ]);
+  const [fornecedores, setFornecedores] = useState([
+    { id: '1', nome: 'AgroGrãos Ltda.', contato: 'João Silva', telefone: '(11) 98765-4321' },
+    { id: '2', nome: 'NutriCampo S.A.', contato: 'Maria Souza', telefone: '(21) 99876-5432' },
+  ]);
+  const [clientes, setClientes] = useState([
+    { id: '1', nome: 'Fazenda Boa Vista', contato: 'Carlos Pereira', telefone: '(21) 91234-5678' },
+    { id: '2', nome: 'Granja Esperança', contato: 'Ana Costa', telefone: '(31) 92345-6789' },
+  ]);
+  const [formulas, setFormulas] = useState([
+    { id: '1', nome: 'Fórmula Padrão Frango', produtoId: '1', ingredientes: [{ insumoId: '1', quantidadePorUnidadeProduto: 0.7, unidade: 'kg' }, { insumoId: '2', quantidadePorUnidadeProduto: 0.3, unidade: 'kg' }] },
+  ]);
+  const [ordensProducao, setOrdensProducao] = useState([
+    { id: 'op1', data: '2025-07-16', formulaId: '1', quantidadeProduzida: 500, status: 'Pendente' },
+    { id: 'op2', data: '2025-07-15', formulaId: '1', quantidadeProduzida: 300, status: 'Concluído', dataConclusao: '2025-07-15' },
+  ]);
+  const [pedidos, setPedidos] = useState([
+    { id: 'ped1', clienteId: '1', dataPedido: '2025-07-15', itens: [{ produtoId: '1', quantidade: 100, precoUnitario: 3.00 }], valorTotal: 300, status: 'Pendente', formaPagamento: 'Pix', prazoPagamento: 'À vista' },
+    { id: 'ped2', clienteId: '2', dataPedido: '2025-07-14', itens: [{ produtoId: '2', quantidade: 50, precoUnitario: 2.80 }], valorTotal: 140, status: 'Concluído', formaPagamento: 'Boleto', prazoPagamento: '30 dias', dataConclusao: '2025-07-14' },
+  ]);
+  const [contasAPagar, setContasAPagar] = useState([
+    { id: 'cp1', descricao: 'Aluguel Galpão', valor: 1500, dataVencimento: '2025-07-20', fornecedorId: '1', status: 'Pendente' },
+    { id: 'cp2', descricao: 'Energia Elétrica', valor: 500, dataVencimento: '2025-07-10', fornecedorId: '', status: 'Pendente' },
+    { id: 'cp3', descricao: 'Compra de Soja', valor: 600, dataVencimento: '2025-07-01', fornecedorId: '2', status: 'Pago', dataPagamento: '2025-06-30' },
+  ]);
+  const [contasAReceber, setContasAReceber] = useState([
+    { id: 'cr1', descricao: 'Venda Pedido ped1', valor: 300, dataVencimento: '2025-07-18', clienteId: '1', status: 'Pendente' },
+    { id: 'cr2', descricao: 'Venda Pedido ped2', valor: 140, dataVencimento: '2025-07-14', clienteId: '2', status: 'Recebido', dataRecebimento: '2025-07-14' },
+    { id: 'cr3', descricao: 'Consultoria Agrícola', valor: 250, dataVencimento: '2025-07-05', clienteId: '1', status: 'Pendente' },
+  ]);
+  const [movimentacoes, setMovimentacoes] = useState([
+    { id: 'mov1', data: '2025-07-16', tipo: 'entrada', itemId: '1', nomeItem: 'Milho', unidade: 'kg', quantidade: 100, numeroNota: 'NF-001', fornecedorId: '1', formaPagamento: 'Pix', prazoPagamento: 'À vista' },
+    { id: 'mov2', data: '2025-07-15', tipo: 'saida', itemId: '1', nomeItem: 'Ração Frango Inicial', unidade: 'kg', quantidade: 50, numeroNota: 'NF-002', clienteId: '1', formaPagamento: 'Boleto', prazoPagamento: '30 dias' },
+  ]);
+  const [allUserProfiles, setAllUserProfiles] = useState([
+    { id: 'local-admin-user', email: 'admin@local.com', name: 'Administrador Local', role: 'admin' }
+  ]); // Para GerenciarUsuarios - simulado
+
+  // Estados para formulários de edição/criação
+  const [editingItem, setEditingItem] = useState(null);
+  const [formType, setFormType] = useState('');
+
+  // Estados para o modal de confirmação de exclusão ou produção/pedido
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalMessage, setConfirmModalMessage] = useState('');
+  const [confirmModalAction, setConfirmModalAction] = useState(() => () => {});
+
+  // Estados para o item a ser excluído ou ordem a ser confirmada
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [typeToDelete, setTypeToDelete] = useState('');
+  const [orderToConfirm, setOrderToConfirm] = useState(null);
+  const [pedidoToConfirm, setPedidoToConfirm] = useState(null);
+  const [contaToConfirm, setContaToConfirm] = useState(null);
+  const [contaTypeToConfirm, setContaTypeToConfirm] = useState('');
+
+  // Funções CRUD Locais
+  const getCollection = (type) => {
+    switch (type) {
+      case 'insumo': return insumos;
+      case 'produto': return produtos;
+      case 'fornecedor': return fornecedores;
+      case 'cliente': return clientes;
+      case 'formula': return formulas;
+      case 'ordemProducao': return ordensProducao;
+      case 'pedido': return pedidos;
+      case 'contaPagar': return contasAPagar;
+      case 'contaReceber': return contasAReceber;
+      case 'movimentacao': return movimentacoes;
+      case 'userProfile': return allUserProfiles; // Para gerenciar usuários (simulado)
+      default: return [];
+    }
+  };
+
+  const setCollection = (type, newData) => {
+    switch (type) {
+      case 'insumo': setInsumos(newData); break;
+      case 'produto': setProdutos(newData); break;
+      case 'fornecedor': setFornecedores(newData); break;
+      case 'cliente': setClientes(newData); break;
+      case 'formula': setFormulas(newData); break;
+      case 'ordemProducao': setOrdensProducao(newData); break;
+      case 'pedido': setPedidos(newData); break;
+      case 'contaPagar': setContasAPagar(newData); break;
+      case 'contaReceber': setContasAReceber(newData); break;
+      case 'movimentacao': setMovimentacoes(newData); break;
+      case 'userProfile': setAllUserProfiles(newData); break;
+      default: break;
+    }
+  };
+
+  const addItem = async (type, newItem) => {
+    console.log(`[addItem] Tentando adicionar item do tipo: ${type}, com dados:`, newItem);
+    try {
+      const currentCollection = getCollection(type);
+      const newItemWithId = { ...newItem, id: crypto.randomUUID() };
+      setCollection(type, [...currentCollection, newItemWithId]);
+      console.log(`[addItem] Item adicionado com sucesso. Nova coleção de ${type}:`, getCollection(type));
+      showAppMessage('Sucesso!', `${type.charAt(0).toUpperCase() + type.slice(1)} adicionado com sucesso!`, 'success');
+    } catch (error) {
+      console.error(`[addItem] Erro ao adicionar ${type}:`, error);
+      showAppMessage('Erro ao Adicionar', `Não foi possível adicionar o ${type}. Detalhes: ${error.message}`, 'error');
+    }
+  };
+
+  const updateItem = async (type, updatedItem) => {
+    console.log(`[updateItem] Tentando atualizar item do tipo: ${type}, com dados:`, updatedItem);
+    try {
+      const currentCollection = getCollection(type);
+      setCollection(type, currentCollection.map(item =>
+        item.id === updatedItem.id ? updatedItem : item
+      ));
+      console.log(`[updateItem] Item atualizado com sucesso. Nova coleção de ${type}:`, getCollection(type));
+      showAppMessage('Sucesso!', `${type.charAt(0).toUpperCase() + type.slice(1)} atualizado com sucesso!`, 'success');
+    } catch (error) {
+      console.error(`[updateItem] Erro ao atualizar ${type}:`, error);
+      showAppMessage('Erro ao Atualizar', `Não foi possível atualizar o ${type}. Detalhes: ${error.message}`, 'error');
+    }
+  };
+
+  const deleteItem = async (type, id) => {
+    console.log(`[deleteItem] Tentando excluir item do tipo: ${type}, com ID: ${id}`);
+    try {
+      const currentCollection = getCollection(type);
+      setCollection(type, currentCollection.filter(item => item.id !== id));
+      console.log(`[deleteItem] Item excluído com sucesso. Nova coleção de ${type}:`, getCollection(type));
+      showAppMessage('Sucesso!', `${type.charAt(0).toUpperCase() + type.slice(1)} excluído com sucesso!`, 'success');
+    } catch (error) {
+      console.error(`[deleteItem] Erro ao excluir ${type}:`, error);
+      showAppMessage('Erro ao Excluir', `Não foi possível excluir o ${type}. Detalhes: ${error.message}`, 'error');
+    }
+  };
+
+  const handleDeleteConfirmed = () => {
+    if (itemToDelete && typeToDelete) {
+      deleteItem(typeToDelete, itemToDelete.id);
+    }
+    setShowConfirmModal(false);
+    setItemToDelete(null);
+    setTypeToDelete('');
+  };
+
+  const handleDeleteRequest = (type, item) => {
+    setItemToDelete(item);
+    setTypeToDelete(type);
+    setConfirmModalMessage(`Tem certeza que deseja excluir "${item.nome || item.id || item.descricao}"? Esta ação não pode ser desfeita.`);
+    setConfirmModalAction(() => handleDeleteConfirmed);
+    setShowConfirmModal(true);
+  };
+
+  const handleEdit = (item, type) => {
+    setEditingItem(item);
+    setFormType(type);
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const newItem = {};
+    formData.forEach((value, key) => {
+      newItem[key] = key === 'estoque' || key === 'custo' || key === 'preco' || key === 'quantidadeProduzida' || key === 'quantidadeNecessaria' || key === 'quantidade' || key === 'precoUnitario' || key === 'valorTotal' || key === 'valor' ? parseFloat(value) : value;
+    });
+
+    console.log(`[handleSave] Tipo de formulário: ${formType}, Dados coletados:`, newItem);
+
+    if (formType === 'formula') {
+      const ingredientes = [];
+      // Ensure we get all elements, even if there's only one
+      const ingredienteIdElements = e.target.querySelectorAll('[name="ingredienteId"]');
+      const quantidadeNecessariaElements = e.target.querySelectorAll('[name="quantidadeNecessaria"]');
+      const ingredienteUnidadeElements = e.target.querySelectorAll('[name="ingredienteUnidade"]');
+
+      for (let i = 0; i < ingredienteIdElements.length; i++) {
+        ingredientes.push({
+          insumoId: ingredienteIdElements[i].value,
+          quantidadePorUnidadeProduto: parseFloat(quantidadeNecessariaElements[i].value),
+          unidade: ingredienteUnidadeElements[i].value,
+        });
+      }
+      newItem.ingredientes = ingredientes;
+      console.log("[handleSave - formula] Ingredientes processados:", ingredientes);
+    } else if (formType === 'pedido') {
+        const itens = [];
+        const produtoIdElements = e.target.querySelectorAll('[name="produtoId"]');
+        const quantidadeElements = e.target.querySelectorAll('[name="quantidade"]');
+        const precoUnitarioElements = e.target.querySelectorAll('[name="precoUnitario"]');
+
+        for (let i = 0; i < produtoIdElements.length; i++) {
+            itens.push({
+                produtoId: produtoIdElements[i].value,
+                quantidade: parseFloat(quantidadeElements[i].value),
+                precoUnitario: parseFloat(precoUnitarioElements[i].value),
+            });
+        }
+        newItem.itens = itens;
+        newItem.valorTotal = itens.reduce((sum, item) => sum + (item.quantidade * item.precoUnitario), 0);
+        newItem.dataPedido = new Date().toISOString().slice(0, 10);
+        newItem.status = 'Pendente';
+        newItem.formaPagamento = formData.get('formaPagamento');
+        newItem.prazoPagamento = formData.get('prazoPagamento');
+        console.log("[handleSave - pedido] Itens processados:", itens);
+    } else if (formType === 'contaPagar') {
+        newItem.status = 'Pendente';
+    } else if (formType === 'contaReceber') {
+        newItem.status = 'Pendente';
+    }
+
+    if (editingItem && editingItem.id) {
+      console.log(`[handleSave] Atualizando item existente (ID: ${editingItem.id}) do tipo ${formType}.`);
+      updateItem(formType, { ...editingItem, ...newItem });
+    } else {
+      console.log(`[handleSave] Adicionando novo item do tipo ${formType}.`);
+      addItem(formType, newItem);
+    }
+    setEditingItem(null);
+    setFormType('');
+  };
+
+  const handleCancel = () => {
+    setEditingItem(null);
+    setFormType('');
+  };
+
+  // Funções de Autenticação (simuladas para modo local)
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setUserId(null);
+    setUserRole(null);
+    setCurrentPage('login'); // Redireciona para uma tela de "login" simulada
+    showAppMessage('Logout', 'Sessão encerrada (simulada).', 'info');
+  };
+
+  // Componente de Navegação Inferior
+  const Navbar = () => (
+    <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-green-600 to-lime-700 p-2 shadow-lg z-50 rounded-t-xl">
+      <ul className="flex justify-around items-center h-full">
+        {/* Pedidos - Apenas para Admin e Vendas */}
+        {(userRole === 'admin' || userRole === 'vendas') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('pedidos')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${currentPage === 'pedidos' ? 'bg-white text-green-700 shadow-md' : 'text-white hover:bg-green-700'}`}
+            >
+              <ShoppingCart size={20} />
+              <span className="text-xs mt-1">Pedidos</span>
+            </button>
+          </li>
+        )}
+        {/* Produção - Apenas para Admin e Produção */}
+        {(userRole === 'admin' || userRole === 'producao') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('producao')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300
+                ${currentPage === 'producao' ? 'bg-yellow-400 text-green-900 shadow-lg scale-110' : 'text-white hover:bg-green-700'}`} style={{ transform: currentPage === 'producao' ? 'scale(1.1)' : 'scale(1)' }}
+            >
+              <Factory size={20} />
+              <span className="text-xs mt-1">Produção</span>
+            </button>
+          </li>
+        )}
+        {/* Financeiro - Apenas para Admin e Financeiro */}
+        {(userRole === 'admin' || userRole === 'financeiro') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('financeiro')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${currentPage === 'financeiro' ? 'bg-white text-green-700 shadow-md' : 'text-white hover:bg-green-700'}`}
+            >
+              <DollarSign size={20} />
+              <span className="text-xs mt-1">Financeiro</span>
+            </button>
+          </li>
+        )}
+        {/* Movimentação - Apenas para Admin */}
+        {(userRole === 'admin') && (
+          <li>
+            <button
+              onClick={() => setCurrentPage('movimentacao')}
+              className={`flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${currentPage === 'movimentacao' ? 'bg-white text-green-700 shadow-md' : 'text-white hover:bg-green-700'}`}
+            >
+              <ArrowLeftRight size={20} />
+              <span className="text-xs mt-1">Mov.</span>
+            </button>
+          </li>
+        )}
+      </ul>
+    </nav>
+  );
+
+  // Componente de Cabeçalho
+  const Header = ({ title }) => (
+    <header className="sticky top-0 bg-gradient-to-r from-green-700 to-lime-800 text-white p-4 text-center shadow-md rounded-b-xl z-40 flex justify-between items-center px-4 sm:px-6">
+      <button
+        onClick={() => {
+          setCurrentPage('dashboard');
+          setShowCadastroMenu(true);
+        }}
+        className="text-white hover:text-green-200 transition-colors duration-300 p-2 rounded-lg"
+        title="Início e Cadastros"
+      >
+        <Home size={24} />
+      </button>
+      <h1 className="text-xl sm:text-2xl font-bold">{title}</h1>
+      <div className="flex items-center">
+        {userRole && (
+          <p className="text-sm mr-2">Perfil: <span className="font-semibold">{userRole.charAt(0).toUpperCase() + userRole.slice(1)}</span></p>
+        )}
+        {currentUser && (
+          <>
+            {/* Botão de configurações de utilizador removido, pois não há alteração de senha local */}
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 text-white px-3 py-1 rounded-md shadow-sm hover:bg-red-600 transition-colors duration-300 flex items-center"
+              title="Sair"
+            >
+              <LogOut size={18} className="mr-1" /> Sair (Simulado)
+            </button>
+          </>
+        )}
+      </div>
+      {userId && (
+        <p className="text-xs mt-1 opacity-80 absolute bottom-1 left-1/2 -translate-x-1/2">ID do Utilizador: {userId}</p>
+      )}
+    </header>
+  );
+
+  // Componente de Modal/Formulário
+  const FormModal = ({ children, title, onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md animate-fade-in-up overflow-y-auto max-h-[90vh]">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-green-800">{title}</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={24} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  // Componente de Confirmação
+  const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm animate-fade-in-up text-center">
+        <Info size={48} className="mx-auto text-yellow-500 mb-4" />
+        <p className="text-lg font-semibold text-gray-800 mb-6">{message}</p>
+        <div className="flex justify-center space-x-4">
+          <button
+            onClick={onCancel}
+            className="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="bg-red-600 text-white px-6 py-2 rounded-lg shadow-md hover:bg-red-700 transition-colors duration-300"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Componente de Mensagem (Sucesso/Erro/Info)
+  const MessageModal = ({ title, message, type, onClose }) => {
+    let icon;
+    let bgColor;
+    let textColor;
+
+    switch (type) {
+      case 'success':
+        icon = <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-green-500 mx-auto mb-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+        bgColor = 'bg-green-100';
+        textColor = 'text-green-800';
+        break;
+      case 'error':
+        icon = <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-red-500 mx-auto mb-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12z" /></svg>;
+        bgColor = 'bg-red-100';
+        textColor = 'text-red-800';
+        break;
+      case 'info':
+      default:
+        icon = <Info size={48} className="mx-auto text-blue-500 mb-4" />;
+        bgColor = 'bg-blue-100';
+        textColor = 'text-blue-800';
+        break;
+    }
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className={`p-6 rounded-xl shadow-2xl w-full max-w-sm animate-fade-in-up text-center ${bgColor}`}>
+          {icon}
+          <h3 className={`text-xl font-bold mb-3 ${textColor}`}>{title}</h3>
+          <p className={`text-lg mb-6 ${textColor}`}>{message}</p>
+          <button
+            onClick={onClose}
+            className="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300"
+          >
+            Ok
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Novo Componente: Menu de Cadastro
+  const CadastroMenuModal = ({ onClose }) => {
+    const handleNavigate = (page) => {
+      setCurrentPage(page);
+      onClose();
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md animate-fade-in-up">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-green-800">Cadastros</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <X size={28} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Insumos - Apenas para Admin */}
+            {(userRole === 'admin') && (
+              <button
+                onClick={() => handleNavigate('insumos')}
+                className="flex flex-col items-center p-4 bg-green-100 text-green-800 rounded-lg shadow-sm hover:bg-green-200 transition-colors duration-300"
+              >
+                <Wheat size={32} className="mb-2" />
+                <span className="font-semibold">Insumos</span>
+              </button>
+            )}
+            {/* Produtos - Apenas para Admin e Produção (para ver estoque, mas não editar) */}
+            {(userRole === 'admin' || userRole === 'producao') && (
+              <button
+                onClick={() => handleNavigate('produtos')}
+                className="flex flex-col items-center p-4 bg-purple-100 text-purple-800 rounded-lg shadow-sm hover:bg-purple-200 transition-colors duration-300"
+              >
+                <Package size={32} className="mb-2" />
+                <span className="font-semibold">Produtos</span>
+              </button>
+            )}
+            {/* Fornecedores - Apenas para Admin e Financeiro */}
+            {(userRole === 'admin' || userRole === 'financeiro') && (
+              <button
+                onClick={() => handleNavigate('fornecedores')}
+                className="flex flex-col items-center p-4 bg-blue-100 text-blue-800 rounded-lg shadow-sm hover:bg-blue-200 transition-colors duration-300"
+              >
+                <Truck size={32} className="mb-2" />
+                <span className="font-semibold">Fornecedores</span>
+              </button>
+            )}
+            {/* Clientes - Apenas para Admin, Vendas e Financeiro */}
+            {(userRole === 'admin' || userRole === 'vendas' || userRole === 'financeiro') && (
+              <button
+                onClick={() => handleNavigate('clientes')}
+                className="flex flex-col items-center p-4 bg-yellow-100 text-yellow-800 rounded-lg shadow-sm hover:bg-yellow-200 transition-colors duration-300"
+              >
+                <Users size={32} className="mb-2" />
+                <span className="font-semibold">Clientes</span>
+              </button>
+            )}
+            {/* NOVO: Fórmulas de Ração - Apenas para Admin */}
+            {(userRole === 'admin') && (
+              <button
+                onClick={() => handleNavigate('formulas')}
+                className="flex flex-col items-center p-4 bg-orange-100 text-orange-800 rounded-lg shadow-sm hover:bg-orange-200 transition-colors duration-300"
+              >
+                <Factory size={32} className="mb-2" /> {/* Usando o ícone de fábrica para ração */}
+                <span className="font-semibold">Fórmulas de Ração</span>
+              </button>
+            )}
+            {/* Gerenciar Utilizadores - Apenas para Admin (removido para modo local) */}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Função auxiliar para verificar se uma data está atrasada
+  const isOverdue = (dueDateString, status) => {
+    if (status !== 'Pendente') return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normaliza para o início do dia
+    const dueDate = new Date(dueDateString + 'T00:00:00'); // Garante que a data seja analisada corretamente
+    return dueDate < today;
+  };
+
+  // Componente Dashboard
+  const Dashboard = () => {
+    const todayISO = new Date().toISOString().slice(0, 10); // Obtém a data de hoje no formato YYYY-MM-DD
+
+    const totalInsumosEstoque = insumos.reduce((sum, item) => sum + item.estoque, 0);
+    const totalProdutosEstoque = produtos.reduce((sum, item) => sum + item.estoque, 0);
+
+    const topInsumos = [...insumos].sort((a, b) => b.estoque - a.estoque).slice(0, 3);
+    const maxInsumoEstoque = Math.max(...topInsumos.map(item => item.estoque), 1);
+
+    const topProdutos = [...produtos].sort((a, b) => b.estoque - a.estoque).slice(0, 3);
+    const maxProdutoEstoque = Math.max(...topProdutos.map(item => item.estoque), 1);
+
+    // Lógica para Clientes Ativos/Inativos e Clientes em Atraso
+    const getClientActivityAndOverdueSummary = () => {
+      let activeClientsCount = 0;
+      let inactiveClientsCount = 0;
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+
+      // Mapa para armazenar a última data do pedido para cada cliente
+      const clientLastOrderDates = new Map();
+      pedidos.forEach(pedido => {
+        const orderDate = new Date(pedido.dataPedido);
+        if (!clientLastOrderDates.has(pedido.clienteId) || orderDate > clientLastOrderDates.get(pedido.clienteId)) {
+          clientLastOrderDates.set(pedido.clienteId, orderDate);
+        }
+      });
+
+      clientes.forEach(client => {
+        const lastOrderDate = clientLastOrderDates.get(client.id);
+        if (lastOrderDate && lastOrderDate >= thirtyDaysAgo) {
+          activeClientsCount++;
+        } else {
+          inactiveClientsCount++;
+        }
+      });
+
+      // Calcula clientes em atraso e valor total em atraso
+      const overdueClientsMap = new Map(); // clienteId -> valor total em atraso
+      contasAReceber.forEach(conta => {
+        if (isOverdue(conta.dataVencimento, conta.status)) {
+          const currentOverdue = overdueClientsMap.get(conta.clienteId) || 0;
+          overdueClientsMap.set(conta.clienteId, currentOverdue + conta.valor);
+        }
+      });
+
+      const totalOverdueClients = overdueClientsMap.size;
+      const totalOverdueValue = Array.from(overdueClientsMap.values()).reduce((sum, val) => sum + val, 0);
+
+      return {
+        activeClientsCount,
+        inactiveClientsCount,
+        totalOverdueClients,
+        totalOverdueValue,
+      };
+    };
+
+    const { activeClientsCount, inactiveClientsCount, totalOverdueClients, totalOverdueValue } = getClientActivityAndOverdueSummary();
+
+    // Lógica para Consumo de Insumos e Alerta de Estoque
+    const getInsumoStockAlerts = () => {
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+
+      const insumoConsumptionLast7Days = {}; // { insumoId: totalConsumedQuantity }
+
+      // Calcula o consumo de ordens de produção concluídas nos últimos 7 dias
+      ordensProducao.forEach(order => {
+        if (order.status === 'Concluído' && order.dataConclusao) {
+          const completionDate = new Date(order.dataConclusao + 'T00:00:00');
+          if (completionDate >= sevenDaysAgo && completionDate <= today) {
+            const formula = formulas.find(f => f.id === order.formulaId);
+            if (formula && formula.ingredientes) {
+              formula.ingredientes.forEach(ingrediente => {
+                const consumedAmount = ingrediente.quantidadePorUnidadeProduto * order.quantidadeProduzida;
+                insumoConsumptionLast7Days[ingrediente.insumoId] = (insumoConsumptionLast7Days[ingrediente.insumoId] || 0) + consumedAmount;
+              });
+            }
+          }
+        }
+      });
+
+      const insufficientInsumos = [];
+
+      insumos.forEach(insumo => {
+        const consumedQty = insumoConsumptionLast7Days[insumo.id] || 0;
+        const dailyConsumption = consumedQty / 7; // Consumo diário médio nos últimos 7 dias
+        const projectedConsumptionNext7Days = dailyConsumption * 7; // Projeção para os próximos 7 dias
+
+        if (insumo.estoque < projectedConsumptionNext7Days) {
+          insufficientInsumos.push({
+            ...insumo,
+            projectedConsumption: projectedConsumptionNext7Days,
+            consumptionRate: dailyConsumption,
+          });
+        }
+      });
+
+      return insufficientInsumos;
+    };
+
+    const insufficientInsumos = getInsumoStockAlerts();
+
+    // Nova lógica para Venda de Produtos e Alerta de Estoque
+    const getProdutoStockAlerts = () => {
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+
+      const productSalesLast7Days = {}; // { productId: totalSoldQuantity }
+
+      // Calcula as vendas de pedidos concluídos nos últimos 7 dias
+      pedidos.forEach(pedido => {
+        if (pedido.status === 'Concluído' && pedido.dataConclusao) { // Assumindo que dataConclusao é definida na conclusão
+          const completionDate = new Date(pedido.dataConclusao + 'T00:00:00');
+          if (completionDate >= sevenDaysAgo && completionDate <= today) {
+            if (pedido.itens) {
+              pedido.itens.forEach(item => {
+                productSalesLast7Days[item.produtoId] = (productSalesLast7Days[item.produtoId] || 0) + item.quantidade;
+              });
+            }
+          }
+        }
+      });
+
+      const insufficientProdutos = [];
+
+      produtos.forEach(produto => {
+        const soldQty = productSalesLast7Days[produto.id] || 0;
+        const dailySales = soldQty / 7; // Vendas diárias médias nos últimos 7 dias
+        const projectedSalesNext7Days = dailySales * 7; // Projeção para os próximos 7 dias
+
+        if (produto.estoque < projectedSalesNext7Days) {
+          insufficientProdutos.push({
+            ...produto,
+            projectedSales: projectedSalesNext7Days,
+            consumptionRate: dailySales,
+          });
+        }
+      });
+
+      return insufficientProdutos;
+    };
+
+    const insufficientProdutos = getProdutoStockAlerts();
+
+    // Lógica para Títulos a Pagar em Aberto
+    const getUnpaidSupplierBillsSummary = () => {
+      const unpaidBills = contasAPagar.filter(conta => conta.status === 'Pendente');
+      const totalUnpaidValue = unpaidBills.reduce((sum, conta) => sum + conta.valor, 0);
+      const totalUnpaidCount = unpaidBills.length;
+      return { totalUnpaidCount, totalUnpaidValue };
+    };
+
+    const { totalUnpaidCount, totalUnpaidValue } = getUnpaidSupplierBillsSummary();
+
+    // Lógica para Total de Produção
+    const getDailyProductionSummary = () => {
+      let completedOrdersToday = 0;
+      let pendingOrdersToday = 0;
+      let totalKgProducedToday = 0;
+
+      ordensProducao.forEach(order => {
+        if (order.status === 'Concluído' && order.dataConclusao === todayISO) {
+          completedOrdersToday++;
+          totalKgProducedToday += order.quantidadeProduzida;
+        } else if (order.status === 'Pendente' && order.data === todayISO) {
+          pendingOrdersToday++;
+        }
+      });
+
+      return {
+        completedOrdersToday,
+        pendingOrdersToday,
+        totalKgProducedToday,
+      };
+    };
+
+    const { completedOrdersToday, pendingOrdersToday, totalKgProducedToday } = getDailyProductionSummary();
+
+
+    return (
+      <div className="p-4 space-y-6">
+        <h2 className="text-2xl font-bold text-green-800 mb-4">Visão Geral</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Todos os cards agora são visíveis para o "admin" (papel padrão) */}
+          <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+            <h3 className="text-lg font-semibold text-green-700 flex items-center mb-2"><Wheat size={20} className="mr-2"/> Total de Insumos</h3>
+            <p className="text-3xl font-bold text-gray-800">{insumos.length}</p>
+            <p className="text-sm text-gray-600">Estoque Total: {totalInsumosEstoque.toLocaleString('pt-BR')} kg</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+            <h3 className="text-lg font-semibold text-green-700 flex items-center mb-2"><Package size={20} className="mr-2"/> Total de Produtos</h3>
+            <p className="text-3xl font-bold text-gray-800">{produtos.length}</p>
+            <p className="text-sm text-gray-600">Estoque Total: {totalProdutosEstoque.toLocaleString('pt-BR')} kg</p>
+          </div>
+          <div
+            className="bg-white p-6 rounded-xl shadow-md border border-green-200 cursor-pointer hover:bg-green-50 transition-colors duration-300"
+            onClick={() => setCurrentPage('contasAPagarEmAberto')}
+          >
+            <h3 className="text-lg font-semibold text-green-700 flex items-center mb-2"><Truck size={20} className="mr-2"/> Total de Fornecedores</h3>
+            <p className="text-3xl font-bold text-gray-800">{fornecedores.length}</p>
+            <p className="text-sm text-gray-600">Títulos a Pagar em Aberto: <span className="font-bold text-red-600">{totalUnpaidCount}</span> (R$ {totalUnpaidValue.toFixed(2)})</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+            <h3 className="text-lg font-semibold text-green-700 flex items-center mb-2"><Users size={20} className="mr-2"/> Total de Clientes</h3>
+            <p className="text-3xl font-bold text-gray-800">{clientes.length}</p>
+            <p className="text-sm text-gray-600 flex items-center"><CheckCircle size={16} className="text-green-500 mr-1"/> Ativos: {activeClientsCount}</p>
+            <p className="text-sm text-gray-600 flex items-center"><XCircle size={16} className="text-red-500 mr-1"/> Inativos (30+ dias): {inactiveClientsCount}</p>
+          </div>
+          <div
+            className="bg-white p-6 rounded-xl shadow-md border border-red-300 cursor-pointer hover:bg-red-50 transition-colors duration-300"
+            onClick={() => setCurrentPage('clientesEmAtraso')}
+          >
+            <h3 className="text-lg font-semibold text-red-700 flex items-center mb-2"><Clock size={20} className="mr-2"/> Clientes em Atraso</h3>
+            <p className="text-3xl font-bold text-gray-800">{totalOverdueClients}</p>
+            <p className="text-sm text-gray-600">Valor Total: R$ {totalOverdueValue.toFixed(2)}</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-md border border-blue-300">
+            <h3 className="text-lg font-semibold text-blue-700 flex items-center mb-2"><Box size={20} className="mr-2"/> Total de Produção (Hoje)</h3>
+            <p className="text-3xl font-bold text-gray-800">{totalKgProducedToday.toLocaleString('pt-BR')} kg</p>
+            <p className="text-sm text-gray-600 flex items-center"><CheckCircle size={16} className="text-green-500 mr-1"/> Ordens Concluídas: {completedOrdersToday}</p>
+            <p className="text-sm text-gray-600 flex items-center"><Clock size={16} className="text-yellow-500 mr-1"/> Ordens Pendentes: {pendingOrdersToday}</p>
+          </div>
+        </div>
+
+        {/* Alerta de Estoque de Insumos */}
+        <div className="bg-white p-6 rounded-xl shadow-md border border-yellow-300">
+          <h3 className="text-lg font-semibold text-yellow-700 flex items-center mb-4"><AlertTriangle size={20} className="mr-2"/> Alerta de Estoque de Insumos (Próximos 7 dias)</h3>
+          {insufficientInsumos.length === 0 ? (
+            <p className="text-gray-500">Todos os insumos estão com estoque suficiente para os próximos 7 dias.</p>
+          ) : (
+            <ul className="list-disc list-inside text-gray-700">
+              {insufficientInsumos.map(insumo => (
+                <li key={insumo.id} className="text-red-600 font-medium">
+                  {insumo.nome}: Estoque atual de {insumo.estoque.toLocaleString('pt-BR')} {insumo.unidade} é insuficiente para a demanda projetada de {insumo.projectedConsumption.toFixed(2).toLocaleString('pt-BR')} {insumo.unidade}.
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Alerta de Estoque de Produtos */}
+        <div className="bg-white p-6 rounded-xl shadow-md border border-orange-300">
+          <h3 className="text-lg font-semibold text-orange-700 flex items-center mb-4"><AlertTriangle size={20} className="mr-2"/> Alerta de Estoque de Produtos (Próximos 7 dias)</h3>
+          {insufficientProdutos.length === 0 ? (
+            <p className="text-gray-500">Todos os produtos estão com estoque suficiente para os próximos 7 dias.</p>
+          ) : (
+            <ul className="list-disc list-inside text-gray-700">
+              {insufficientProdutos.map(produto => (
+                <li key={produto.id} className="text-red-600 font-medium">
+                  {produto.nome}: Estoque atual de {produto.estoque.toLocaleString('pt-BR')} {produto.unidade} é insuficiente para a venda projetada de {produto.projectedSales.toFixed(2).toLocaleString('pt-BR')} {produto.unidade}.
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Gráfico de Estoque de Insumos */}
+        <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+          <h3 className="text-lg font-semibold text-green-700 flex items-center mb-4"><Wheat size={20} className="mr-2"/> Estoque de Insumos (Top 3)</h3>
+          {topInsumos.length === 0 ? (
+            <p className="text-gray-500">Nenhum insumo para exibir.</p>
+          ) : (
+            <div className="space-y-4">
+              {topInsumos.map(item => (
+                <div key={item.id} className="flex items-center">
+                  <span className="w-24 text-sm font-medium text-gray-700 truncate mr-2">{item.nome}</span>
+                  <div className="flex-1 bg-gray-200 rounded-full h-4">
+                    <div
+                      className="bg-green-500 h-4 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${(item.estoque / maxInsumoEstoque) * 100}%` }}
+                      title={`${item.estoque} ${item.unidade}`}
+                    ></div>
+                  </div>
+                  <span className="ml-2 text-sm text-gray-600">{item.estoque.toLocaleString('pt-BR')} {item.unidade}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Gráfico de Estoque de Produtos */}
+        <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+          <h3 className="text-lg font-semibold text-green-700 flex items-center mb-4"><Package size={20} className="mr-2"/> Estoque de Produtos (Top 3)</h3>
+          <p className="text-3xl font-bold text-gray-800">{produtos.length}</p>
+          {topProdutos.length === 0 ? (
+            <p className="text-gray-500">Nenhum produto para exibir.</p>
+          ) : (
+            <div className="space-y-4">
+              {topProdutos.map(item => (
+                <div key={item.id} className="flex items-center">
+                  <span className="w-24 text-sm font-medium text-gray-700 truncate mr-2">{item.nome}</span>
+                  <div className="flex-1 bg-gray-200 rounded-full h-4">
+                    <div
+                      className="bg-purple-500 h-4 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${(item.estoque / maxProdutoEstoque) * 100}%` }}
+                      title={`${item.estoque} ${item.unidade}`}
+                    ></div>
+                  </div>
+                  <span className="ml-2 text-sm text-gray-600">{item.estoque.toLocaleString('pt-BR')} {item.unidade}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Movimentações Recentes */}
+        <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+          <h3 className="text-lg font-semibold text-green-700 flex items-center mb-2"><ArrowLeftRight size={20} className="mr-2"/> Movimentações Recentes</h3>
+          {movimentacoes.length === 0 ? (
+            <p className="text-gray-500">Nenhuma movimentação recente registada.</p>
+          ) : (
+            <ul className="list-disc list-inside text-gray-700">
+              {movimentacoes.slice(-5).reverse().map(mov => {
+                const fornecedorMov = fornecedores.find(f => f.id === mov.fornecedorId);
+                return (
+                  <li key={mov.id}>
+                    {mov.data} - {mov.tipo === 'entrada' ? 'Entrada' : 'Saída'} de {mov.quantidade} {mov.unidade} de {mov.nomeItem} (Nota: {mov.numeroNota || 'N/A'}) {fornecedorMov ? ` - Fornecedor: ${fornecedorMov.nome}` : ''}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Componente de Listagem Genérica com Busca
+  const ItemList = ({ title, items, type, fields, onAdd, onEdit, onDelete, canAdd, canEdit, canDelete }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredItems = items.filter(item =>
+      Object.values(item).some(value =>
+        String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+
+    return (
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-green-800 mb-4">{title}</h2>
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-3 sm:space-y-0 sm:space-x-4">
+          {canAdd && (
+            <button
+              onClick={onAdd}
+              className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center justify-center"
+            >
+              <Plus size={20} className="mr-2" /> Adicionar {title.slice(0, -1)}
+            </button>
+          )}
+          <div className="relative w-full sm:w-1/2">
+            <input
+              type="text"
+              placeholder={`Buscar em ${title}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+              aria-label={`Buscar em ${title}`}
+            />
+            <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md overflow-hidden border border-green-200">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-green-100">
+                <tr>
+                  {fields.map(field => (
+                    <th key={field.key} className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      {field.label}
+                    </th>
+                  ))}
+                  {(canEdit || canDelete) && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={fields.length + (canEdit || canDelete ? 1 : 0)} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                      Nenhum item encontrado.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map(item => (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      {fields.map(field => (
+                        <td key={field.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {field.format ? field.format(item[field.key]) : item[field.key]}
+                        </td>
+                      ))}
+                      {(canEdit || canDelete) && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => onEdit(item, type)}
+                            className="text-blue-600 hover:text-blue-900 mr-3"
+                            title="Editar"
+                            aria-label={`Editar ${item.nome || item.id}`}
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => onDelete(type, item)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Excluir"
+                            aria-label={`Excluir ${item.nome || item.id}`}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Formulários Específicos para o Modal
+  const InsumoForm = () => (
+    <form onSubmit={handleSave} className="space-y-4">
+      <div>
+        <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome do Insumo</label>
+        <input
+          type="text"
+          id="nome"
+          name="nome"
+          defaultValue={editingItem?.nome || ''}
+          placeholder="Ex: Milho"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="unidade" className="block text-sm font-medium text-gray-700">Unidade de Medida</label>
+        <input
+          type="text"
+          id="unidade"
+          name="unidade"
+          defaultValue={editingItem?.unidade || ''}
+          placeholder="Ex: kg, g, litro"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="estoque" className="block text-sm font-medium text-gray-700">Estoque (kg/un)</label>
+        <input
+          type="number"
+          id="estoque"
+          name="estoque"
+          defaultValue={editingItem?.estoque || 0}
+          placeholder="0"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="custo" className="block text-sm font-medium text-gray-700">Custo por Unidade (R$)</label>
+        <input
+          type="number"
+          id="custo"
+          name="custo"
+          step="0.01"
+          defaultValue={editingItem?.custo || 0}
+          placeholder="0.00"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div className="flex justify-end space-x-3 mt-6">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+        >
+          <X size={18} className="mr-2" /> Cancelar
+        </button>
+        <button
+          type="submit"
+          className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+        >
+          <Save size={18} className="mr-2" /> Salvar
+        </button>
+      </div>
+    </form>
+  );
+
+  const ProdutoForm = () => (
+    <form onSubmit={handleSave} className="space-y-4">
+      <div>
+        <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome do Produto</label>
+        <input
+          type="text"
+          id="nome"
+          name="nome"
+          defaultValue={editingItem?.nome || ''}
+          placeholder="Ex: Ração Frango Inicial"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="unidade" className="block text-sm font-medium text-gray-700">Unidade de Venda</label>
+        <input
+          type="text"
+          id="unidade"
+          name="unidade"
+          defaultValue={editingItem?.unidade || 'kg'}
+          placeholder="Ex: kg, unidade"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="estoque" className="block text-sm font-medium text-gray-700">Estoque (kg)</label>
+        <input
+          type="number"
+          id="estoque"
+          name="estoque"
+          defaultValue={editingItem?.estoque || 0}
+          placeholder="0"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="preco" className="block text-sm font-medium text-gray-700">Preço de Venda (R$)</label>
+        <input
+          type="number"
+          id="preco"
+          name="preco"
+          step="0.01"
+          defaultValue={editingItem?.preco || 0}
+          placeholder="0.00"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div className="flex justify-end space-x-3 mt-6">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+        >
+          <X size={18} className="mr-2" /> Cancelar
+        </button>
+        <button
+          type="submit"
+          className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+        >
+          <Save size={18} className="mr-2" /> Salvar
+        </button>
+      </div>
+    </form>
+  );
+
+  const FornecedorForm = () => (
+    <form onSubmit={handleSave} className="space-y-4">
+      <div>
+        <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome do Fornecedor</label>
+        <input
+          type="text"
+          id="nome"
+          name="nome"
+          defaultValue={editingItem?.nome || ''}
+          placeholder="Ex: AgroGrãos Ltda."
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="contato" className="block text-sm font-medium text-gray-700">Pessoa de Contato</label>
+        <input
+          type="text"
+          id="contato"
+          name="contato"
+          defaultValue={editingItem?.contato || ''}
+          placeholder="Ex: João Silva"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+        />
+      </div>
+      <div>
+        <label htmlFor="telefone" className="block text-sm font-medium text-gray-700">Telefone</label>
+        <input
+          type="tel"
+          id="telefone"
+          name="telefone"
+          defaultValue={editingItem?.telefone || ''}
+          placeholder="Ex: (XX) XXXX-XXXX"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+        />
+      </div>
+      <div className="flex justify-end space-x-3 mt-6">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+        >
+          <X size={18} className="mr-2" /> Cancelar
+        </button>
+        <button
+          type="submit"
+          className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+        >
+          <Save size={18} className="mr-2" /> Salvar
+        </button>
+      </div>
+    </form>
+  );
+
+  const ClienteForm = () => (
+    <form onSubmit={handleSave} className="space-y-4">
+      <div>
+        <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome do Cliente</label>
+        <input
+          type="text"
+          id="nome"
+          name="nome"
+          defaultValue={editingItem?.nome || ''}
+          placeholder="Ex: Fazenda Boa Vista"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="contato" className="block text-sm font-medium text-gray-700">Pessoa de Contato</label>
+        <input
+          type="text"
+          id="contato"
+          name="contato"
+          defaultValue={editingItem?.contato || ''}
+          placeholder="Ex: Carlos Pereira"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+        />
+      </div>
+      <div>
+        <label htmlFor="telefone" className="block text-sm font-medium text-gray-700">Telefone</label>
+        <input
+          type="tel"
+          id="telefone"
+          name="telefone"
+          defaultValue={editingItem?.telefone || ''}
+          placeholder="Ex: (XX) XXXX-XXXX"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+        />
+      </div>
+      <div className="flex justify-end space-x-3 mt-6">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+        >
+          <X size={18} className="mr-2" /> Cancelar
+        </button>
+        <button
+          type="submit"
+          className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+        >
+          <Save size={18} className="mr-2" /> Salvar
+        </button>
+      </div>
+    </form>
+  );
+
+  // Componente de Movimentação de Estoque
+  const MovimentacaoEstoque = () => {
+    const [itemType, setItemType] = useState('insumo');
+    const [selectedInsumo, setSelectedInsumo] = useState('');
+    const [quantidade, setQuantidade] = useState('');
+    const [numeroNota, setNumeroNota] = useState('');
+    const [selectedFornecedorMov, setSelectedFornecedorMov] = useState('');
+    const [formaPagamentoMov, setFormaPagamentoMov] = useState('');
+    const [prazoPagamentoMov, setPrazoPagamentoMov] = useState('');
+
+    const handleMovimentacao = async (e) => {
+      e.preventDefault();
+      if (!selectedInsumo || !quantidade) {
+        showAppMessage('Erro na Movimentação', 'Por favor, selecione um insumo e informe a quantidade.', 'error');
+        return;
+      }
+
+      const insumoToUpdate = insumos.find(item => item.id === selectedInsumo);
+
+      if (!insumoToUpdate) {
+        showAppMessage('Erro na Movimentação', 'Insumo não encontrado.', 'error');
+        return;
+      }
+
+      const newEstoque = insumoToUpdate.estoque + parseFloat(quantidade);
+
+      const updatedInsumo = { ...insumoToUpdate, estoque: newEstoque };
+
+      try {
+        await updateItem('insumo', updatedInsumo);
+
+        const newMovement = {
+          data: new Date().toISOString().slice(0, 10),
+          tipo: 'entrada',
+          itemId: selectedInsumo,
+          nomeItem: insumoToUpdate.nome,
+          unidade: insumoToUpdate.unidade,
+          quantidade: parseFloat(quantidade),
+          numeroNota: numeroNota,
+          fornecedorId: selectedFornecedorMov,
+          formaPagamento: formaPagamentoMov,
+          prazoPagamento: prazoPagamentoMov,
+        };
+        await addItem('movimentacao', newMovement);
+
+        showAppMessage('Sucesso!', `Entrada de ${quantidade} ${insumoToUpdate.unidade} de ${insumoToUpdate.nome} registada com sucesso!`, 'success');
+        setSelectedInsumo('');
+        setQuantidade('');
+        setNumeroNota('');
+        setSelectedFornecedorMov('');
+        setFormaPagamentoMov('');
+        setPrazoPagamentoMov('');
+      } catch (error) {
+        showAppMessage('Erro na Movimentação', `Não foi possível registar a movimentação. Detalhes: ${error.message}`, 'error');
+      }
+    };
+
+    return (
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-green-800 mb-4">Movimentação de Estoque - Entrada de Insumos</h2>
+
+        <div className="bg-white p-6 rounded-xl shadow-md border border-green-200 mb-6">
+          <form onSubmit={handleMovimentacao} className="space-y-4">
+            <div>
+              <label htmlFor="insumoSelect" className="block text-sm font-medium text-gray-700">Selecionar Insumo</label>
+              <select
+                id="insumoSelect"
+                value={selectedInsumo}
+                onChange={(e) => setSelectedInsumo(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+                required
+              >
+                <option value="">Selecione...</option>
+                {insumos.map(item => (
+                  <option key={item.id} value={item.id}>{item.nome} (Estoque: {item.estoque} {item.unidade})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="quantidade" className="block text-sm font-medium text-gray-700">Quantidade</label>
+              <input
+                type="number"
+                id="quantidade"
+                value={quantidade}
+                onChange={(e) => setQuantidade(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+                required
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="numeroNota" className="block text-sm font-medium text-gray-700">Número da Nota</label>
+              <input
+                type="text"
+                id="numeroNota"
+                value={numeroNota}
+                onChange={(e) => setNumeroNota(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Ex: NF-12345"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="fornecedorMov" className="block text-sm font-medium text-gray-700">Fornecedor</label>
+              <select
+                id="fornecedorMov"
+                value={selectedFornecedorMov}
+                onChange={(e) => setSelectedFornecedorMov(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="">Selecione um Fornecedor</option>
+                {fornecedores.map(forn => (
+                  <option key={forn.id} value={forn.id}>{forn.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="formaPagamentoMov" className="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+              <select
+                id="formaPagamentoMov"
+                value={formaPagamentoMov}
+                onChange={(e) => setFormaPagamentoMov(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="">Selecione a Forma</option>
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Cartao de Credito">Cartão de Crédito</option>
+                <option value="Pix">Pix</option>
+                <option value="Boleto">Boleto</option>
+                <option value="Transferencia Bancaria">Transferência Bancária</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="prazoPagamentoMov" className="block text-sm font-medium text-gray-700">Prazo de Pagamento</label>
+              <input
+                type="text"
+                id="prazoPagamentoMov"
+                value={prazoPagamentoMov}
+                onChange={(e) => setPrazoPagamentoMov(e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Ex: À vista, 30 dias"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-green-700 text-white px-4 py-3 rounded-lg shadow-md hover:bg-green-800 transition-colors duration-300 flex items-center justify-center font-semibold text-lg"
+            >
+              <Save size={20} className="mr-2" /> Registar Entrada
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Componente de Página de Produção
+  const PaginaProducao = () => {
+    const handleCreateOrdemProducao = () => {
+      setEditingItem(null);
+      setFormType('ordemProducao');
+    };
+
+    const handleRequestConcluirProducao = (order) => {
+      setOrderToConfirm(order);
+      setConfirmModalMessage(`Deseja realmente concluir a ordem de produção "${order.id}"? Isso irá baixar o estoque de insumos e adicionar ao estoque do produto final.`);
+      setConfirmModalAction(() => () => confirmProductionCompletion(order));
+      setShowConfirmModal(true);
+    };
+
+    const confirmProductionCompletion = async (order) => {
+      console.log("[confirmProductionCompletion] Iniciando conclusão da ordem:", order);
+      const formula = formulas.find(f => f.id === order.formulaId);
+      if (!formula) {
+        showAppMessage('Erro de Produção', 'Fórmula não encontrada para esta ordem de produção.', 'error');
+        setShowConfirmModal(false);
+        console.error("[confirmProductionCompletion] Fórmula não encontrada.");
+        return;
+      }
+      console.log("[confirmProductionCompletion] Fórmula encontrada:", formula);
+
+      let canProduce = true;
+      const insumosToUpdate = [];
+
+      for (const ingrediente of formula.ingredientes) {
+        const insumo = insumos.find(i => i.id === ingrediente.insumoId);
+        if (!insumo) {
+          showAppMessage('Erro de Produção', `Insumo "${ingrediente.insumoId}" não encontrado.`, 'error');
+          canProduce = false;
+          console.error(`[confirmProductionCompletion] Insumo "${ingrediente.insumoId}" não encontrado.`);
+          break;
+        }
+        const quantidadeTotalNecessaria = ingrediente.quantidadePorUnidadeProduto * order.quantidadeProduzida;
+        if (insumo.estoque < quantidadeTotalNecessaria) {
+          showAppMessage('Estoque Insuficiente', `Estoque insuficiente de ${insumo.nome}. Necessário: ${quantidadeTotalNecessaria} ${insumo.unidade}, Disponível: ${insumo.estoque} ${insumo.unidade}.`, 'error');
+          canProduce = false;
+          console.error(`[confirmProductionCompletion] Estoque insuficiente de ${insumo.nome}.`);
+          break;
+        }
+        insumosToUpdate.push({ ...insumo, estoque: insumo.estoque - quantidadeTotalNecessaria });
+      }
+
+      if (!canProduce) {
+        setShowConfirmModal(false);
+        return;
+      }
+      console.log("[confirmProductionCompletion] Insumos a serem atualizados:", insumosToUpdate);
+
+      try {
+        for (const insumo of insumosToUpdate) {
+          await updateItem('insumo', insumo);
+        }
+
+        const produtoFinal = produtos.find(p => p.id === formula.produtoId);
+        if (produtoFinal) {
+          console.log("[confirmProductionCompletion] Produto final encontrado:", produtoFinal);
+          await updateItem('produto', { ...produtoFinal, estoque: produtoFinal.estoque + order.quantidadeProduzida });
+        } else {
+          showAppMessage('Atenção', `Produto final "${formula.produtoId}" não encontrado. Estoque do produto não atualizado.`, 'info');
+          console.warn(`[confirmProductionCompletion] Produto final "${formula.produtoId}" não encontrado.`);
+        }
+
+        await updateItem('ordemProducao', { ...order, status: 'Concluído', dataConclusao: new Date().toISOString().slice(0, 10) });
+        console.log("[confirmProductionCompletion] Ordem de produção marcada como concluída.");
+
+        showAppMessage('Produção Concluída!', `Ordem de produção ${order.id} concluída com sucesso. Estoque atualizado.`, 'success');
+      } catch (error) {
+        console.error("[confirmProductionCompletion] Erro ao concluir produção:", error);
+        showAppMessage('Erro ao Concluir Produção', `Não foi possível concluir a produção. Detalhes: ${error.message}`, 'error');
+      } finally {
+        setShowConfirmModal(false);
+      }
+    };
+
+    const canManageOrders = userRole === 'admin' || userRole === 'producao';
+
+    return (
+      <div className="p-4 space-y-6">
+        <h2 className="text-2xl font-bold text-green-800 mb-4">Módulo de Produção</h2>
+
+        <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+          <h3 className="text-xl font-semibold text-green-700 mb-4 flex items-center"><Factory size={20} className="mr-2"/> Ordens de Produção</h3>
+          {canManageOrders && (
+            <button
+              onClick={handleCreateOrdemProducao}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center mb-4"
+            >
+              <Plus size={20} className="mr-2" /> Nova Ordem de Produção
+            </button>
+          )}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-green-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID Ordem</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Data</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Fórmula</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Qtd. Produzida (kg)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                  {(canManageOrders) && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {ordensProducao.length === 0 ? (
+                  <tr>
+                    <td colSpan={5 + (canManageOrders ? 1 : 0)} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                      Nenhuma ordem de produção.
+                    </td>
+                  </tr>
+                ) : (
+                  ordensProducao.map(order => {
+                    const formulaAssociada = formulas.find(f => f.id === order.formulaId);
+                    return (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.id}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.data}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formulaAssociada ? formulaAssociada.nome : 'Fórmula Não Encontrada'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.quantidadeProduzida}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            order.status === 'Concluído' ? 'bg-green-100 text-green-800' :
+                            order.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        {canManageOrders && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {order.status !== 'Concluído' && (
+                              <button
+                                onClick={() => handleRequestConcluirProducao(order)}
+                                className="text-green-600 hover:text-green-900 mr-3"
+                                title="Concluir Produção"
+                              >
+                                <Save size={18} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteRequest('ordemProducao', order)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Excluir Ordem de Produção"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // NOVO COMPONENTE: Página de Fórmulas
+  const PaginaFormulas = () => {
+    const handleCreateFormula = () => {
+      setEditingItem(null);
+      setFormType('formula');
+    };
+
+    const handleEditFormula = (formula) => {
+      setEditingItem(formula);
+      setFormType('formula');
+    };
+
+    const canManageFormulas = userRole === 'admin';
+
+    return (
+      <div className="p-4 space-y-6">
+        <h2 className="text-2xl font-bold text-green-800 mb-4">Fórmulas de Ração</h2>
+
+        <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+          <h3 className="text-xl font-semibold text-green-700 mb-4 flex items-center"><Factory size={20} className="mr-2"/> Gerenciar Fórmulas</h3>
+          {canManageFormulas && (
+            <button
+              onClick={handleCreateFormula}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-300 flex items-center mb-4"
+            >
+              <Plus size={20} className="mr-2" /> Nova Fórmula
+            </button>
+          )}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-blue-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Nome da Fórmula</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Produto Final</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ingredientes</th>
+                  {(canManageFormulas) && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {formulas.length === 0 ? (
+                  <tr>
+                    <td colSpan={3 + (canManageFormulas ? 1 : 0)} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                      Nenhuma fórmula cadastrada.
+                    </td>
+                  </tr>
+                ) : (
+                  formulas.map(formula => {
+                    const produtoAssociado = produtos.find(p => p.id === formula.produtoId);
+                    return (
+                      <tr key={formula.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formula.nome}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{produtoAssociado ? produtoAssociado.nome : 'Produto Não Encontrado'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          <ul className="list-disc list-inside">
+                            {formula.ingredientes.map((ing, idx) => {
+                              const insumoAssociado = insumos.find(i => i.id === ing.insumoId);
+                              return (
+                                <li key={idx}>
+                                  {insumoAssociado ? insumoAssociado.nome : 'Insumo Não Encontrado'}: {ing.quantidadePorUnidadeProduto} {ing.unidade}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </td>
+                        {canManageFormulas && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => handleEditFormula(formula)}
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                              title="Editar Fórmula"
+                            >
+                              <Edit size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRequest('formula', formula)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Excluir Fórmula"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
+  // Função auxiliar para calcular a data de vencimento com base no prazo de pagamento
+  const calculateDueDate = (startDateString, paymentTerm) => {
+    const startDate = new Date(startDateString + 'T00:00:00');
+    if (paymentTerm.toLowerCase().includes('à vista')) {
+      return startDateString;
+    } else if (paymentTerm.toLowerCase().includes('dias')) {
+      const days = parseInt(paymentTerm.match(/\d+/)[0], 10);
+      if (!isNaN(days)) {
+        startDate.setDate(startDate.getDate() + days);
+        return startDate.toISOString().slice(0, 10);
+      }
+    }
+    return startDateString;
+  };
+
+  // Componente de Página de Pedidos do Cliente
+  const PaginaPedidos = () => {
+    const handleCreatePedido = () => {
+      setEditingItem(null);
+      setFormType('pedido');
+    };
+
+    const handleRequestConcluirPedido = (pedido) => {
+      setPedidoToConfirm(pedido);
+      setConfirmModalMessage(`Deseja realmente concluir o pedido "${pedido.id}" do cliente "${clientes.find(c => c.id === pedido.clienteId)?.nome || 'N/A'}"? Isso irá baixar o estoque dos produtos e gerar uma Conta a Receber.`);
+      setConfirmModalAction(() => () => confirmPedidoCompletion(pedido));
+      setShowConfirmModal(true);
+    };
+
+    const confirmPedidoCompletion = async (pedido) => {
+      console.log("[confirmPedidoCompletion] Iniciando conclusão do pedido:", pedido);
+      let canFulfill = true;
+      const produtosToUpdate = [];
+
+      for (const item of pedido.itens) {
+        const produto = produtos.find(p => p.id === item.produtoId);
+        if (!produto) {
+          showAppMessage('Erro no Pedido', `Produto "${item.produtoId}" não encontrado no estoque.`, 'error');
+          canFulfill = false;
+          console.error(`[confirmPedidoCompletion] Produto "${item.produtoId}" não encontrado.`);
+          break;
+        }
+        if (produto.estoque < item.quantidade) {
+          showAppMessage('Estoque Insuficiente', `Estoque insuficiente de ${produto.nome}. Necessário: ${item.quantidade} kg, Disponível: ${produto.estoque} kg.`, 'error');
+          canFulfill = false;
+          console.error(`[confirmPedidoCompletion] Estoque insuficiente de ${produto.nome}.`);
+          break;
+        }
+        produtosToUpdate.push({ ...produto, estoque: produto.estoque - item.quantidade });
+      }
+
+      if (!canFulfill) {
+        setShowConfirmModal(false);
+        return;
+      }
+      console.log("[confirmPedidoCompletion] Produtos a serem atualizados:", produtosToUpdate);
+
+      try {
+        for (const produto of produtosToUpdate) {
+          await updateItem('produto', produto);
+        }
+
+        await updateItem('pedido', { ...pedido, status: 'Concluído', dataConclusao: new Date().toISOString().slice(0, 10) });
+        console.log("[confirmPedidoCompletion] Pedido marcado como concluído.");
+
+        const dueDate = calculateDueDate(pedido.dataPedido, pedido.prazoPagamento);
+        const newContaReceber = {
+          descricao: `Recebimento de Pedido ${pedido.id}`,
+          valor: pedido.valorTotal,
+          dataVencimento: dueDate,
+          clienteId: pedido.clienteId,
+          status: 'Pendente',
+          dataRecebimento: '',
+        };
+        await addItem('contaReceber', newContaReceber);
+        console.log("[confirmPedidoCompletion] Nova conta a receber gerada:", newContaReceber);
+
+
+        showAppMessage('Pedido Concluído!', `Pedido ${pedido.id} concluído com sucesso. Estoque de produtos atualizado e Conta a Receber gerada.`, 'success');
+      } catch (error) {
+        console.error("[confirmPedidoCompletion] Erro ao concluir pedido:", error);
+        showAppMessage('Erro ao Concluir Pedido', `Não foi possível concluir o pedido. Detalhes: ${error.message}`, 'error');
+      } finally {
+        setShowConfirmModal(false);
+      }
+    };
+
+    const canManagePedidos = userRole === 'admin' || userRole === 'vendas';
+
+    return (
+      <div className="p-4 space-y-6">
+        <h2 className="text-2xl font-bold text-green-800 mb-4">Pedidos do Cliente</h2>
+
+        <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+          <h3 className="text-xl font-semibold text-green-700 mb-4 flex items-center"><ShoppingCart size={20} className="mr-2"/> Lista de Pedidos</h3>
+          {canManagePedidos && (
+            <button
+              onClick={handleCreatePedido}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center mb-4"
+            >
+              <Plus size={20} className="mr-2" /> Novo Pedido
+            </button>
+          )}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-green-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID Pedido</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Data</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Itens</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Valor Total (R$)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Forma Pagamento</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Prazo Pagamento</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                  {(canManagePedidos) && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {pedidos.length === 0 ? (
+                  <tr>
+                    <td colSpan={8 + (canManagePedidos ? 1 : 0)} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                      Nenhum pedido cadastrado.
+                    </td>
+                  </tr>
+                ) : (
+                  pedidos.map(pedido => {
+                    const clienteAssociado = clientes.find(c => c.id === pedido.clienteId);
+                    return (
+                      <tr key={pedido.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{pedido.id}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{clienteAssociado ? clienteAssociado.nome : 'Cliente Não Encontrado'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{pedido.dataPedido}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          <ul className="list-disc list-inside">
+                            {pedido.itens.map((item, idx) => {
+                              const produtoAssociado = produtos.find(p => p.id === item.produtoId);
+                              return (
+                                <li key={idx}>
+                                  {produtoAssociado ? produtoAssociado.nome : 'Produto Não Encontrado'}: {item.quantidade} kg @ R$ {item.precoUnitario.toFixed(2)}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">R$ {pedido.valorTotal.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{pedido.formaPagamento || 'N/A'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{pedido.prazoPagamento || 'N/A'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            pedido.status === 'Concluído' ? 'bg-green-100 text-green-800' :
+                            pedido.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {pedido.status}
+                          </span>
+                        </td>
+                        {canManagePedidos && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {pedido.status !== 'Concluído' && (
+                              <button
+                                onClick={() => handleRequestConcluirPedido(pedido)}
+                                className="text-green-600 hover:text-green-900 mr-3"
+                                title="Concluir Pedido"
+                              >
+                                <Save size={18} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteRequest('pedido', pedido)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Excluir Pedido"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Componente de Página Financeiro (Contas a Pagar e Receber)
+  const PaginaFinanceiro = () => {
+    const [financeiroTab, setFinanceiroTab] = useState('pagar');
+    const [filterPagar, setFilterPagar] = useState('all');
+    const [filterReceber, setFilterReceber] = useState('all');
+
+    const handleMarkAsPaidOrReceived = async (conta, type) => {
+      const updatedConta = { ...conta, status: (type === 'contaPagar' ? 'Pago' : 'Recebido'), dataPagamento: new Date().toISOString().slice(0, 10), dataRecebimento: new Date().toISOString().slice(0, 10) };
+      try {
+        await updateItem(type, updatedConta);
+        showAppMessage('Sucesso!', `Conta ${type === 'contaPagar' ? 'paga' : 'recebida'} com sucesso!`, 'success');
+      } catch (error) {
+        showAppMessage('Erro!', `Não foi possível atualizar o status da conta. Detalhes: ${error.message}`, 'error');
+      } finally {
+        setShowConfirmModal(false);
+      }
+    };
+
+    const handleRequestMarkAsPaidOrReceived = (conta, type) => {
+      setContaToConfirm(conta);
+      setContaTypeToConfirm(type);
+      setConfirmModalMessage(`Tem certeza que deseja marcar esta conta como ${type === 'contaPagar' ? 'Paga' : 'Recebida'}?`);
+      setConfirmModalAction(() => () => handleMarkAsPaidOrReceived(conta, type));
+      setShowConfirmModal(true);
+    };
+
+    const getFilteredContas = (list, filterType) => {
+      let filtered = list;
+
+      if (filterType === 'pendente') {
+        filtered = filtered.filter(conta => conta.status === 'Pendente' && !isOverdue(conta.dataVencimento, conta.status));
+      } else if (filterType === 'pago') {
+        filtered = filtered.filter(conta => conta.status === 'Pago');
+      } else if (filterType === 'recebido') {
+        filtered = filtered.filter(conta => conta.status === 'Recebido');
+      } else if (filterType === 'atrasado') {
+        filtered = filtered.filter(conta => isOverdue(conta.dataVencimento, conta.status));
+      }
+
+      return filtered.sort((a, b) => {
+        const aOverdue = isOverdue(a.dataVencimento, a.status);
+        const bOverdue = isOverdue(b.dataVencimento, b.status);
+
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
+
+        return new Date(a.dataVencimento) - new Date(b.dataVencimento);
+      });
+    };
+
+    const filteredContasAPagar = getFilteredContas(contasAPagar, filterPagar);
+    const filteredContasAReceber = getFilteredContas(contasAReceber, filterReceber);
+
+    const canManageFinanceiro = userRole === 'admin' || userRole === 'financeiro';
+
+    return (
+      <div className="p-4 space-y-6">
+        <h2 className="text-2xl font-bold text-green-800 mb-4">Módulo Financeiro</h2>
+
+        <div className="flex justify-center space-x-4 mb-6">
+          <button
+            onClick={() => setFinanceiroTab('pagar')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-colors duration-300 ${financeiroTab === 'pagar' ? 'bg-red-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          >
+            Contas a Pagar
+          </button>
+          <button
+            onClick={() => setFinanceiroTab('receber')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-colors duration-300 ${financeiroTab === 'receber' ? 'bg-green-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          >
+            Contas a Receber
+          </button>
+        </div>
+
+        {financeiroTab === 'pagar' && (
+          <div className="bg-white p-6 rounded-xl shadow-md border border-red-200">
+            <h3 className="text-xl font-semibold text-red-700 mb-4 flex items-center"><DollarSign size={20} className="mr-2"/> Contas a Pagar</h3>
+            {canManageFinanceiro && (
+              <button
+                onClick={() => handleEdit(null, 'contaPagar')}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-700 transition-colors duration-300 flex items-center mb-4"
+              >
+                <Plus size={20} className="mr-2" /> Adicionar Conta a Pagar
+              </button>
+            )}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-red-100">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Descrição</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Valor (R$)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Vencimento</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Fornecedor</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Data Pgto.</th>
+                    {(canManageFinanceiro) && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredContasAPagar.length === 0 ? (
+                    <tr>
+                      <td colSpan={6 + (canManageFinanceiro ? 1 : 0)} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                        Nenhuma conta a pagar encontrada com este filtro.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredContasAPagar.map(conta => {
+                      const fornecedorAssociado = fornecedores.find(f => f.id === conta.fornecedorId);
+                      const isOverdueAccount = isOverdue(conta.dataVencimento, conta.status);
+                      return (
+                        <tr key={conta.id} className={`hover:bg-gray-50 ${isOverdueAccount ? 'bg-red-50' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.descricao}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">R$ {conta.valor.toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.dataVencimento}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fornecedorAssociado ? fornecedorAssociado.nome : 'N/A'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              conta.status === 'Pago' ? 'bg-green-100 text-green-800' :
+                              isOverdueAccount ? 'bg-red-200 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {isOverdueAccount ? 'Em Atraso' : conta.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.dataPagamento || 'Pendente'}</td>
+                          {canManageFinanceiro && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              {conta.status !== 'Pago' && (
+                                <button
+                                  onClick={() => handleRequestMarkAsPaidOrReceived(conta, 'contaPagar')}
+                                  className="text-green-600 hover:text-green-900 mr-3"
+                                  title="Marcar como Pago"
+                                >
+                                  <Save size={18} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleEdit(conta, 'contaPagar')}
+                                className="text-blue-600 hover:text-blue-900 mr-3"
+                                title="Editar"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRequest('contaPagar', conta)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Excluir"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {financeiroTab === 'receber' && (
+          <div className="bg-white p-6 rounded-xl shadow-md border border-green-200">
+            <h3 className="text-xl font-semibold text-green-700 mb-4 flex items-center"><DollarSign size={20} className="mr-2"/> Contas a Receber</h3>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={() => setFilterReceber('all')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${filterReceber === 'all' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => setFilterReceber('pendente')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${filterReceber === 'pendente' ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                Pendentes
+              </button>
+              <button
+                onClick={() => setFilterReceber('recebido')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${filterReceber === 'recebido' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                Recebidas
+              </button>
+              <button
+                onClick={() => setFilterReceber('atrasado')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${filterReceber === 'atrasado' ? 'bg-red-700 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                Em Atraso
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-green-100">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Descrição</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Valor (R$)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Vencimento</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Cliente</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Data Recbto.</th>
+                    {(canManageFinanceiro) && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredContasAReceber.length === 0 ? (
+                    <tr>
+                      <td colSpan={6 + (canManageFinanceiro ? 1 : 0)} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                        Nenhuma conta a receber encontrada com este filtro.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredContasAReceber.map(conta => {
+                      const clienteAssociado = clientes.find(c => c.id === conta.clienteId);
+                      const isOverdueAccount = isOverdue(conta.dataVencimento, conta.status);
+                      return (
+                        <tr key={conta.id} className={`hover:bg-gray-50 ${isOverdueAccount ? 'bg-red-50' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.descricao}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">R$ {conta.valor.toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.dataVencimento}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{clienteAssociado ? clienteAssociado.nome : 'N/A'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              conta.status === 'Recebido' ? 'bg-green-100 text-green-800' :
+                              isOverdueAccount ? 'bg-red-200 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {isOverdueAccount ? 'Em Atraso' : conta.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.dataRecebimento || 'Pendente'}</td>
+                          {canManageFinanceiro && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              {conta.status !== 'Recebido' && (
+                                <button
+                                  onClick={() => handleRequestMarkAsPaidOrReceived(conta, 'contaReceber')}
+                                  className="text-green-600 hover:text-green-900 mr-3"
+                                  title="Marcar como Recebido"
+                                >
+                                  <Save size={18} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleEdit(conta, 'contaReceber')}
+                                className="text-blue-600 hover:text-blue-900 mr-3"
+                                title="Editar"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRequest('contaReceber', conta)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Excluir"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Novo Componente: Página de Clientes em Atraso
+  const PaginaClientesEmAtraso = () => {
+    const overdueReceivables = contasAReceber.filter(conta => isOverdue(conta.dataVencimento, conta.status));
+
+    const clientsWithOverdue = {};
+    overdueReceivables.forEach(conta => {
+      if (!clientsWithOverdue[conta.clienteId]) {
+        clientsWithOverdue[conta.clienteId] = {
+          client: clientes.find(c => c.id === conta.clienteId),
+          totalOverdue: 0,
+          accounts: [],
+        };
+      }
+      clientsWithOverdue[conta.clienteId].totalOverdue += conta.valor;
+      clientsWithOverdue[conta.clienteId].accounts.push(conta);
+    });
+
+    const overdueClientList = Object.values(clientsWithOverdue);
+
+    return (
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-red-800 mb-4 flex items-center">
+          <Clock size={24} className="mr-2" /> Clientes com Contas em Atraso
+        </h2>
+        <button
+          onClick={() => setCurrentPage('dashboard')}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center mb-4"
+        >
+          <ArrowLeftRight size={18} className="mr-2" /> Voltar para o Dashboard
+        </button>
+
+        <div className="bg-white rounded-xl shadow-md overflow-hidden border border-red-200">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-red-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Telefone</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Total em Atraso (R$)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Contas em Atraso</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {overdueClientList.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                      Nenhum cliente com contas em atraso.
+                    </td>
+                  </tr>
+                ) : (
+                  overdueClientList.map(clientData => (
+                    <tr key={clientData.client?.id || 'unknown'} className="hover:bg-red-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {clientData.client?.nome || 'Cliente Desconhecido'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {clientData.client?.telefone || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-700 font-bold">
+                        R$ {clientData.totalOverdue.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <ul className="list-disc list-inside">
+                          {clientData.accounts.map(account => (
+                            <li key={account.id}>
+                              {account.descricao} (Vencimento: {account.dataVencimento}, R$ {account.valor.toFixed(2)})
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Novo Componente: Página de Contas a Pagar em Aberto
+  const PaginaContasAPagarEmAberto = () => {
+    const pendingBills = contasAPagar.filter(conta => conta.status === 'Pendente');
+
+    return (
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-red-800 mb-4 flex items-center">
+          <DollarSign size={24} className="mr-2" /> Contas a Pagar em Aberto
+        </h2>
+        <button
+          onClick={() => setCurrentPage('dashboard')}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center mb-4"
+        >
+          <ArrowLeftRight size={18} className="mr-2" /> Voltar para o Dashboard
+        </button>
+
+        <div className="bg-white rounded-xl shadow-md overflow-hidden border border-red-200">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-red-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Descrição</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Valor (R$)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Vencimento</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Fornecedor</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {pendingBills.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                      Nenhuma conta a pagar em aberto.
+                    </td>
+                  </tr>
+                ) : (
+                  pendingBills.map(conta => {
+                    const fornecedorAssociado = fornecedores.find(f => f.id === conta.fornecedorId);
+                    const isOverdueAccount = isOverdue(conta.dataVencimento, conta.status);
+                    return (
+                      <tr key={conta.id} className={`hover:bg-gray-50 ${isOverdueAccount ? 'bg-red-50' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.descricao}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">R$ {conta.valor.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.dataVencimento}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fornecedorAssociado ? fornecedorAssociado.nome : 'N/A'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            conta.status === 'Pago' ? 'bg-green-100 text-green-800' :
+                            isOverdueAccount ? 'bg-red-200 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {isOverdueAccount ? 'Em Atraso' : conta.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{conta.dataPagamento || 'Pendente'}</td>
+                        {(canManageFinanceiro) && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {conta.status !== 'Pago' && (
+                              <button
+                                onClick={() => handleRequestMarkAsPaidOrReceived(conta, 'contaPagar')}
+                                className="text-green-600 hover:text-green-900 mr-3"
+                                title="Marcar como Pago"
+                              >
+                                <Save size={18} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleEdit(conta, 'contaPagar')}
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                              title="Editar"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRequest('contaPagar', conta)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Excluir"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </td>
+                          )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Formulário para Fórmulas
+  const FormulaForm = () => {
+    const [selectedProduto, setSelectedProduto] = useState(editingItem?.produtoId || '');
+    const [currentIngredientes, setCurrentIngredientes] = useState(editingItem?.ingredientes || [{ insumoId: '', quantidadeNecessaria: '', unidade: '' }]);
+
+    useEffect(() => {
+      if (editingItem) {
+        setSelectedProduto(editingItem.produtoId);
+        setCurrentIngredientes(editingItem.ingredientes);
+      } else {
+        setSelectedProduto('');
+        setCurrentIngredientes([{ insumoId: '', quantidadeNecessaria: '', unidade: '' }]);
+      }
+    }, [editingItem]);
+
+    const handleAddIngrediente = () => {
+      setCurrentIngredientes([...currentIngredientes, { insumoId: '', quantidadeNecessaria: '', unidade: '' }]);
+    };
+
+    const handleRemoveIngrediente = (indexToRemove) => {
+      setCurrentIngredientes(currentIngredientes.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleIngredienteChange = (index, field, value) => {
+      const newIngredientes = [...currentIngredientes];
+      newIngredientes[index][field] = value;
+      if (field === 'insumoId') {
+        const selectedInsumo = insumos.find(i => i.id === value);
+        if (selectedInsumo) {
+          newIngredientes[index].unidade = selectedInsumo.unidade;
+        } else {
+          newIngredientes[index].unidade = '';
+        }
+      }
+      setCurrentIngredientes(newIngredientes);
+    };
+
+    const handleSubmitFormula = (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const newFormula = {
+        nome: formData.get('nome'),
+        produtoId: selectedProduto,
+        ingredientes: currentIngredientes.map(ing => ({
+          insumoId: ing.insumoId,
+          quantidadePorUnidadeProduto: parseFloat(ing.quantidadeNecessaria),
+          unidade: ing.unidade,
+        })),
+      };
+
+      console.log("[FormulaForm] Submetendo fórmula:", newFormula);
+
+      if (editingItem && editingItem.id) {
+        updateItem('formula', { ...editingItem, ...newFormula });
+      } else {
+        addItem('formula', newFormula);
+      }
+      handleCancel();
+    };
+
+    return (
+      <form onSubmit={handleSubmitFormula} className="space-y-4">
+        <div>
+          <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome da Fórmula</label>
+          <input
+            type="text"
+            id="nome"
+            name="nome"
+            defaultValue={editingItem?.nome || ''}
+            placeholder="Ex: Ração Frango Inicial - Agroceres"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="produtoId" className="block text-sm font-medium text-gray-700">Produto Final</label>
+          <select
+            id="produtoId"
+            name="produtoId"
+            value={selectedProduto}
+            onChange={(e) => setSelectedProduto(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          >
+            <option value="">Selecione um Produto</option>
+            {produtos.map(prod => (
+              <option key={prod.id} value={prod.id}>{prod.nome}</option>
+            ))}
+          </select>
+        </div>
+
+        <h4 className="text-md font-semibold text-gray-700 mt-6 mb-2">Ingredientes:</h4>
+        {currentIngredientes.map((ing, index) => (
+          <div key={index} className="flex flex-col sm:flex-row gap-2 items-end border p-3 rounded-md bg-gray-50">
+            <div className="flex-1 w-full">
+              <label htmlFor={`ingredienteId-${index}`} className="block text-xs font-medium text-gray-600">Insumo</label>
+              <select
+                id={`ingredienteId-${index}`}
+                name="ingredienteId"
+                value={ing.insumoId}
+                onChange={(e) => handleIngredienteChange(index, 'insumoId', e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                required
+              >
+                <option value="">Selecione um Insumo</option>
+                {insumos.map(insumo => (
+                  <option key={insumo.id} value={insumo.id}>{insumo.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full sm:w-1/3">
+              <label htmlFor={`quantidadeNecessaria-${index}`} className="block text-xs font-medium text-gray-600">Qtd. Necessária</label>
+              <input
+                type="number"
+                id={`quantidadeNecessaria-${index}`}
+                name="quantidadeNecessaria"
+                value={ing.quantidadeNecessaria}
+                onChange={(e) => handleIngredienteChange(index, 'quantidadeNecessaria', e.target.value)}
+                step="0.001"
+                placeholder="0.000"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                required
+              />
+            </div>
+            <div className="w-full sm:w-1/4">
+              <label htmlFor={`ingredienteUnidade-${index}`} className="block text-xs font-medium text-gray-600">Unidade</label>
+              <input
+                type="text"
+                id={`ingredienteUnidade-${index}`}
+                name="ingredienteUnidade"
+                value={ing.unidade}
+                onChange={(e) => handleIngredienteChange(index, 'unidade', e.target.value)}
+                placeholder="Unidade"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                required
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => handleRemoveIngrediente(index)}
+              className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors duration-200"
+              title="Remover Ingrediente"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={handleAddIngrediente}
+          className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-300 transition-colors duration-300 flex items-center mt-4"
+        >
+          <Plus size={18} className="mr-2" /> Adicionar Ingrediente
+        </button>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+          >
+            <X size={18} className="mr-2" /> Cancelar
+          </button>
+          <button
+            type="submit"
+            className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+          >
+            <Save size={18} className="mr-2" /> Salvar Fórmula
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  // Formulário para Ordem de Produção
+  const OrdemProducaoForm = () => {
+    const [selectedProduto, setSelectedProduto] = useState('');
+    const [formulasDisponiveis, setFormulasDisponiveis] = useState([]);
+    const [selectedFormula, setSelectedFormula] = useState('');
+
+    useEffect(() => {
+      if (selectedProduto) {
+        const filteredFormulas = formulas.filter(f => f.produtoId === selectedProduto);
+        setFormulasDisponiveis(filteredFormulas);
+        setSelectedFormula(filteredFormulas.length > 0 ? filteredFormulas[0].id : '');
+      } else {
+        setFormulasDisponiveis([]);
+        setSelectedFormula('');
+      }
+    }, [selectedProduto, formulas]);
+
+    const handleSubmitOrdemProducao = (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const quantidade = parseFloat(formData.get('quantidadeProduzida'));
+
+      if (!selectedFormula || !quantidade) {
+        showAppMessage('Erro', 'Por favor, preencha todos os campos.', 'error');
+        return;
+      }
+
+      const newOrder = {
+        data: new Date().toISOString().slice(0, 10),
+        formulaId: selectedFormula,
+        quantidadeProduzida: quantidade,
+        status: 'Pendente',
+      };
+
+      console.log("[OrdemProducaoForm] Submetendo ordem de produção:", newOrder);
+      addItem('ordemProducao', newOrder);
+      showAppMessage('Sucesso!', 'Ordem de produção criada com sucesso!', 'success');
+      handleCancel();
+    };
+
+    return (
+      <form onSubmit={handleSubmitOrdemProducao} className="space-y-4">
+        <div>
+          <label htmlFor="produtoSelect" className="block text-sm font-medium text-gray-700">Produto a ser Produzido</label>
+          <select
+            id="produtoSelect"
+            value={selectedProduto}
+            onChange={(e) => setSelectedProduto(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          >
+            <option value="">Selecione um Produto</option>
+            {produtos.map(prod => (
+              <option key={prod.id} value={prod.id}>{prod.nome}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="formulaSelect" className="block text-sm font-medium text-gray-700">Fórmula de Ração</label>
+          <select
+            id="formulaSelect"
+            value={selectedFormula}
+            onChange={(e) => setSelectedFormula(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+            disabled={formulasDisponiveis.length === 0}
+          >
+            <option value="">Selecione uma Fórmula</option>
+            {formulasDisponiveis.map(formula => (
+              <option key={formula.id} value={formula.id}>{formula.nome}</option>
+            ))}
+          </select>
+          {selectedProduto && formulasDisponiveis.length === 0 && (
+            <p className="text-sm text-red-500 mt-1">Não há fórmulas cadastradas para este produto.</p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="quantidadeProduzida" className="block text-sm font-medium text-gray-700">Quantidade a Produzir (kg)</label>
+          <input
+            type="number"
+            id="quantidadeProduzida"
+            name="quantidadeProduzida"
+            step="0.01"
+            placeholder="0.00"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+            min="0.01"
+          />
+        </div>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+          >
+            <X size={18} className="mr-2" /> Cancelar
+          </button>
+          <button
+            type="submit"
+            className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+          >
+            <Save size={18} className="mr-2" /> Criar Ordem
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  // Formulário para Pedidos do Cliente
+  const PedidoForm = () => {
+    const [selectedCliente, setSelectedCliente] = useState(editingItem?.clienteId || '');
+    const [currentItens, setCurrentItens] = useState(editingItem?.itens || [{ produtoId: '', quantidade: '', precoUnitario: '' }]);
+    const [totalPedido, setTotalPedido] = useState(editingItem?.valorTotal || 0);
+    const [formaPagamento, setFormaPagamento] = useState(editingItem?.formaPagamento || '');
+    const [prazoPagamento, setPrazoPagamento] = useState(editingItem?.prazoPagamento || '');
+
+    useEffect(() => {
+      calculateTotal();
+    }, [currentItens]);
+
+    const calculateTotal = () => {
+      const total = currentItens.reduce((sum, item) => {
+        const qty = parseFloat(item.quantidade) || 0;
+        const price = parseFloat(item.precoUnitario) || 0;
+        return sum + (qty * price);
+      }, 0);
+      setTotalPedido(total);
+    };
+
+    const handleAddProdutoItem = () => {
+      setCurrentItens([...currentItens, { produtoId: '', quantidade: '', precoUnitario: '' }]);
+    };
+
+    const handleRemoveProdutoItem = (indexToRemove) => {
+      setCurrentItens(currentItens.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleProdutoItemChange = (index, field, value) => {
+      const newItens = [...currentItens];
+      newItens[index][field] = value;
+
+      if (field === 'produtoId') {
+        const selectedProduto = produtos.find(p => p.id === value);
+        if (selectedProduto) {
+          newItens[index].precoUnitario = selectedProduto.preco;
+        } else {
+          newItens[index].precoUnitario = '';
+        }
+      }
+      setCurrentItens(newItens);
+    };
+
+    const handleSubmitPedido = (e) => {
+      e.preventDefault();
+      if (!selectedCliente || currentItens.length === 0 || currentItens.some(item => !item.produtoId || !item.quantidade || !item.precoUnitario)) {
+        showAppMessage('Erro', 'Por favor, preencha todos os campos do pedido e adicione pelo menos um item válido.', 'error');
+        return;
+      }
+
+      const newPedido = {
+        clienteId: selectedCliente,
+        dataPedido: new Date().toISOString().slice(0, 10),
+        itens: currentItens.map(item => ({
+          produtoId: item.produtoId,
+          quantidade: parseFloat(item.quantidade),
+          precoUnitario: parseFloat(item.precoUnitario),
+        })),
+        valorTotal: totalPedido,
+        status: 'Pendente',
+        formaPagamento: formaPagamento,
+        prazoPagamento: prazoPagamento,
+      };
+
+      console.log("[PedidoForm] Submetendo pedido:", newPedido);
+      addItem('pedido', newPedido);
+      showAppMessage('Sucesso!', 'Pedido criado com sucesso!', 'success');
+      handleCancel();
+    };
+
+    return (
+      <form onSubmit={handleSubmitPedido} className="space-y-4">
+        <div>
+          <label htmlFor="clienteSelect" className="block text-sm font-medium text-gray-700">Cliente</label>
+          <select
+            id="clienteSelect"
+            name="clienteId"
+            value={selectedCliente}
+            onChange={(e) => setSelectedCliente(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          >
+            <option value="">Selecione um Cliente</option>
+            {clientes.map(cliente => (
+              <option key={cliente.id} value={cliente.id}>{cliente.nome}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="formaPagamento" className="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+          <select
+            id="formaPagamento"
+            name="formaPagamento"
+            value={formaPagamento}
+            onChange={(e) => setFormaPagamento(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          >
+            <option value="">Selecione a Forma</option>
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="Cartao de Credito">Cartão de Crédito</option>
+            <option value="Pix">Pix</option>
+            <option value="Boleto">Boleto</option>
+            <option value="Transferencia Bancaria">Transferência Bancária</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="prazoPagamento" className="block text-sm font-medium text-gray-700">Prazo de Pagamento</label>
+          <input
+            type="text"
+            id="prazoPagamento"
+            name="prazoPagamento"
+            value={prazoPagamento}
+            onChange={(e) => setPrazoPagamento(e.target.value)}
+            placeholder="Ex: À vista, 30 dias, 15/30/45 dias"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          />
+        </div>
+
+        <h4 className="text-md font-semibold text-gray-700 mt-6 mb-2">Itens do Pedido:</h4>
+        {currentItens.map((item, index) => (
+          <div key={index} className="flex flex-col sm:flex-row gap-2 items-end border p-3 rounded-md bg-gray-50">
+            <div className="flex-1 w-full">
+              <label htmlFor={`produtoId-${index}`} className="block text-xs font-medium text-gray-600">Produto</label>
+              <select
+                id={`produtoId-${index}`}
+                name="produtoId"
+                value={item.produtoId}
+                onChange={(e) => handleProdutoItemChange(index, 'produtoId', e.target.value)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                required
+              >
+                <option value="">Selecione um Produto</option>
+                {produtos.map(produto => (
+                  <option key={produto.id} value={produto.id}>{produto.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full sm:w-1/4">
+              <label htmlFor={`quantidade-${index}`} className="block text-xs font-medium text-gray-600">Qtd (kg)</label>
+              <input
+                type="number"
+                id={`quantidade-${index}`}
+                name="quantidade"
+                value={item.quantidade}
+                onChange={(e) => handleProdutoItemChange(index, 'quantidade', e.target.value)}
+                step="0.01"
+                placeholder="0.00"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                required
+              />
+            </div>
+            <div className="w-full sm:w-1/4">
+              <label htmlFor={`precoUnitario-${index}`} className="block text-xs font-medium text-gray-600">Preço Unit. (R$)</label>
+              <input
+                type="number"
+                id={`precoUnitario-${index}`}
+                name="precoUnitario"
+                value={item.precoUnitario}
+                onChange={(e) => handleProdutoItemChange(index, 'precoUnitario', e.target.value)}
+                step="0.01"
+                placeholder="0.00"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
+                required
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => handleRemoveProdutoItem(index)}
+              className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors duration-200"
+              title="Remover Item"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={handleAddProdutoItem}
+          className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-300 transition-colors duration-300 flex items-center mt-4"
+        >
+          <Plus size={18} className="mr-2" /> Adicionar Item
+        </button>
+
+        <div className="text-right text-lg font-bold text-green-800 mt-4">
+          Valor Total do Pedido: R$ {totalPedido.toFixed(2)}
+        </div>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+          >
+            <X size={18} className="mr-2" /> Cancelar
+          </button>
+          <button
+            type="submit"
+            className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+          >
+            <Save size={18} className="mr-2" /> Salvar Pedido
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  // Formulário para Contas a Pagar
+  const ContaPagarForm = () => {
+    const [selectedFornecedor, setSelectedFornecedor] = useState(editingItem?.fornecedorId || '');
+
+    const handleSubmitContaPagar = (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const newConta = {
+        descricao: formData.get('descricao'),
+        valor: parseFloat(formData.get('valor')),
+        dataVencimento: formData.get('dataVencimento'),
+        fornecedorId: selectedFornecedor,
+        status: editingItem?.status || 'Pendente',
+        dataPagamento: editingItem?.dataPagamento || '',
+      };
+
+      console.log("[ContaPagarForm] Submetendo conta a pagar:", newConta);
+
+      if (editingItem && editingItem.id) {
+        updateItem('contaPagar', { ...editingItem, ...newConta });
+      } else {
+        addItem('contaPagar', newConta);
+      }
+      handleCancel();
+    };
+
+    return (
+      <form onSubmit={handleSubmitContaPagar} className="space-y-4">
+        <div>
+          <label htmlFor="descricao" className="block text-sm font-medium text-gray-700">Descrição</label>
+          <input
+            type="text"
+            id="descricao"
+            name="descricao"
+            defaultValue={editingItem?.descricao || ''}
+            placeholder="Ex: Aluguel do galpão"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-red-500 focus:border-red-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="valor" className="block text-sm font-medium text-gray-700">Valor (R$)</label>
+          <input
+            type="number"
+            id="valor"
+            name="valor"
+            step="0.01"
+            defaultValue={editingItem?.valor || 0}
+            placeholder="0.00"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-red-500 focus:border-red-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="dataVencimento" className="block text-sm font-medium text-gray-700">Data de Vencimento</label>
+          <input
+            type="date"
+            id="dataVencimento"
+            name="dataVencimento"
+            defaultValue={editingItem?.dataVencimento || ''}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-red-500 focus:border-red-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="fornecedorSelect" className="block text-sm font-medium text-gray-700">Fornecedor (Opcional)</label>
+          <select
+            id="fornecedorSelect"
+            name="fornecedorId"
+            value={selectedFornecedor}
+            onChange={(e) => setSelectedFornecedor(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-red-500 focus:border-red-500"
+          >
+            <option value="">Nenhum</option>
+            {fornecedores.map(forn => (
+              <option key={forn.id} value={forn.id}>{forn.nome}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+        >
+            <X size={18} className="mr-2" /> Cancelar
+          </button>
+          <button
+            type="submit"
+            className="bg-red-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-700 transition-colors duration-300 flex items-center"
+          >
+            <Save size={18} className="mr-2" /> Salvar Conta
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  // Formulário para Contas a Receber
+  const ContaReceberForm = () => {
+    const [selectedCliente, setSelectedCliente] = useState(editingItem?.clienteId || '');
+
+    const handleSubmitContaReceber = (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const newConta = {
+        descricao: formData.get('descricao'),
+        valor: parseFloat(formData.get('valor')),
+        dataVencimento: formData.get('dataVencimento'),
+        clienteId: selectedCliente,
+        status: editingItem?.status || 'Pendente',
+        dataRecebimento: editingItem?.dataRecebimento || '',
+      };
+
+      console.log("[ContaReceberForm] Submetendo conta a receber:", newConta);
+
+      if (editingItem && editingItem.id) {
+        updateItem('contaReceber', { ...editingItem, ...newConta });
+      } else {
+        addItem('contaReceber', newConta);
+      }
+      handleCancel();
+    };
+
+    return (
+      <form onSubmit={handleSubmitContaReceber} className="space-y-4">
+        <div>
+          <label htmlFor="descricao" className="block text-sm font-medium text-gray-700">Descrição</label>
+          <input
+            type="text"
+            id="descricao"
+            name="descricao"
+            defaultValue={editingItem?.descricao || ''}
+            placeholder="Ex: Venda de ração para Fazenda X"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="valor" className="block text-sm font-medium text-gray-700">Valor (R$)</label>
+          <input
+            type="number"
+            id="valor"
+            name="valor"
+            step="0.01"
+            defaultValue={editingItem?.valor || 0}
+            placeholder="0.00"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="dataVencimento" className="block text-sm font-medium text-gray-700">Data de Vencimento</label>
+          <input
+            type="date"
+            id="dataVencimento"
+            name="dataVencimento"
+            defaultValue={editingItem?.dataVencimento || ''}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="clienteSelect" className="block text-sm font-medium text-gray-700">Cliente (Opcional)</label>
+          <select
+            id="clienteSelect"
+            name="clienteId"
+            value={selectedCliente}
+            onChange={(e) => setSelectedCliente(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
+          >
+            <option value="">Nenhum</option>
+            {clientes.map(cli => (
+              <option key={cli.id} value={cli.id}>{cli.nome}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-400 transition-colors duration-300 flex items-center"
+          >
+            <X size={18} className="mr-2" /> Cancelar
+          </button>
+          <button
+            type="submit"
+            className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300 flex items-center"
+          >
+            <Save size={18} className="mr-2" /> Salvar Conta
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  // --- COMPONENTES AUXILIARES PARA ADMIN (GerenciarUsuarios) ---
+  // Este componente foi removido para o modo local, pois não há gestão de usuários sem Firebase Auth.
+  // Apenas mantendo o placeholder para referência.
+
+  // Renderização principal do App
+  return (
+    <AppMessageContext.Provider value={{ appMessage, setAppMessage }}>
+      <div className="min-h-screen bg-gray-100 font-sans antialiased flex flex-col">
+        <style>
+          {`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          body {
+            font-family: 'Inter', sans-serif;
+          }
+          .animate-fade-in-up {
+            animation: fadeInUp 0.3s ease-out;
+          }
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          `}
+        </style>
+
+        <Header title="Fábrica de Ração (Modo Local)" currentUser={currentUser} userRole={userRole} handleLogout={handleLogout} setCurrentPage={setCurrentPage} />
+
+        <main className="flex-grow pb-20">
+          {currentPage === 'dashboard' && <Dashboard />}
+          {currentPage === 'insumos' && (
+            <ItemList
+              title="Insumos"
+              items={insumos}
+              type="insumo"
+              fields={[
+                { key: 'nome', label: 'Nome' },
+                { key: 'unidade', label: 'Unidade' },
+                { key: 'estoque', label: 'Estoque' },
+                { key: 'custo', label: 'Custo (R$)' },
+              ]}
+              onAdd={() => handleEdit(null, 'insumo')}
+              onEdit={handleEdit}
+              onDelete={handleDeleteRequest}
+              canAdd={userRole === 'admin' || userRole === 'producao'}
+              canEdit={userRole === 'admin' || userRole === 'producao'}
+              canDelete={userRole === 'admin'}
+            />
+          )}
+
+          {currentPage === 'produtos' && (
+            <ItemList
+              title="Produtos"
+              items={produtos}
+              type="produto"
+              fields={[
+                { key: 'nome', label: 'Nome' },
+                { key: 'unidade', label: 'Unidade' },
+                { key: 'estoque', label: 'Estoque' },
+                { key: 'preco', label: 'Preço Venda (R$)' },
+              ]}
+              onAdd={() => handleEdit(null, 'produto')}
+              onEdit={handleEdit}
+              onDelete={handleDeleteRequest}
+              canAdd={userRole === 'admin' || userRole === 'producao'}
+              canEdit={userRole === 'admin' || userRole === 'producao'}
+              canDelete={userRole === 'admin'}
+            />
+          )}
+
+          {currentPage === 'fornecedores' && (
+            <ItemList
+              title="Fornecedores"
+              items={fornecedores}
+              type="fornecedor"
+              fields={[
+                { key: 'nome', label: 'Nome' },
+                { key: 'contato', label: 'Contato' },
+                { key: 'telefone', label: 'Telefone' },
+              ]}
+              onAdd={() => handleEdit(null, 'fornecedor')}
+              onEdit={handleEdit}
+              onDelete={handleDeleteRequest}
+              canAdd={userRole === 'admin' || userRole === 'financeiro'}
+              canEdit={userRole === 'admin' || userRole === 'financeiro'}
+              canDelete={userRole === 'admin'}
+            />
+          )}
+
+          {currentPage === 'clientes' && (
+            <ItemList
+              title="Clientes"
+              items={clientes}
+              type="cliente"
+              fields={[
+                { key: 'nome', label: 'Nome' },
+                { key: 'contato', label: 'Contato' },
+                { key: 'telefone', label: 'Telefone' },
+              ]}
+              onAdd={() => handleEdit(null, 'cliente')}
+              onEdit={handleEdit}
+              onDelete={handleDeleteRequest}
+              canAdd={userRole === 'admin' || userRole === 'vendas'}
+              canEdit={userRole === 'admin' || userRole === 'vendas'}
+              canDelete={userRole === 'admin'}
+            />
+          )}
+
+          {/* NOVA PÁGINA: Fórmulas de Ração */}
+          {currentPage === 'formulas' && (userRole === 'admin') && (
+            <PaginaFormulas />
+          )}
+
+          {currentPage === 'producao' && (userRole === 'admin' || userRole === 'producao') && (
+            <PaginaProducao />
+          )}
+
+          {currentPage === 'pedidos' && (userRole === 'admin' || userRole === 'vendas') && (
+            <PaginaPedidos />
+          )}
+
+          {currentPage === 'financeiro' && (userRole === 'admin' || userRole === 'financeiro') && (
+            <PaginaFinanceiro />
+          )}
+
+          {currentPage === 'contasAPagarEmAberto' && (userRole === 'admin' || userRole === 'financeiro') && (
+            <PaginaContasAPagarEmAberto />
+          )}
+
+          {currentPage === 'clientesEmAtraso' && (userRole === 'admin' || userRole === 'financeiro' || userRole === 'vendas') && (
+            <PaginaClientesEmAtraso />
+          )}
+
+          {currentPage === 'movimentacao' && (userRole === 'admin') && (
+            <MovimentacaoEstoque />
+          )}
+
+          {/* GerenciarUsuarios foi removido para o modo local */}
+        </main>
+
+        {/* Modal de Confirmação Genérico */}
+        {showConfirmModal && (
+          <ConfirmationModal
+            message={confirmModalMessage}
+            onConfirm={confirmModalAction}
+            onCancel={() => setShowConfirmModal(false)}
+          />
+        )}
+
+        {/* Modais de Formulário */}
+        {editingItem !== null && formType === 'insumo' && (
+          <FormModal title={editingItem ? 'Editar Insumo' : 'Adicionar Insumo'} onClose={handleCancel}>
+            <InsumoForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'produto' && (
+          <FormModal title={editingItem ? 'Editar Produto' : 'Adicionar Produto'} onClose={handleCancel}>
+            <ProdutoForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'fornecedor' && (
+          <FormModal title={editingItem ? 'Editar Fornecedor' : 'Adicionar Fornecedor'} onClose={handleCancel}>
+            <FornecedorForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'cliente' && (
+          <FormModal title={editingItem ? 'Editar Cliente' : 'Adicionar Cliente'} onClose={handleCancel}>
+            <ClienteForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'formula' && (
+          <FormModal title={editingItem ? 'Editar Fórmula' : 'Adicionar Fórmula'} onClose={handleCancel}>
+            <FormulaForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'ordemProducao' && (
+          <FormModal title={editingItem ? 'Editar Ordem de Produção' : 'Criar Ordem de Produção'} onClose={handleCancel}>
+            <OrdemProducaoForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'pedido' && (
+          <FormModal title={editingItem ? 'Editar Pedido' : 'Criar Novo Pedido'} onClose={handleCancel}>
+            <PedidoForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'contaPagar' && (
+          <FormModal title={editingItem ? 'Editar Conta a Pagar' : 'Adicionar Conta a Pagar'} onClose={handleCancel}>
+            <ContaPagarForm />
+          </FormModal>
+        )}
+        {editingItem !== null && formType === 'contaReceber' && (
+          <FormModal title={editingItem ? 'Editar Conta a Receber' : 'Adicionar Conta a Receber'} onClose={handleCancel}>
+            <ContaReceberForm />
+          </FormModal>
+        )}
+
+        {/* Modais de autenticação removidos para o modo local */}
+
+        {showCadastroMenu && (
+          <CadastroMenuModal onClose={() => setShowCadastroMenu(false)} />
+        )}
+
+        <Navbar />
+        <AppMessageDisplay />
+      </div>
+    </AppMessageContext.Provider>
+  );
+}
+
+export default App;
